@@ -44,7 +44,7 @@ Infrastructure is in `infra/bicep/`. GitHub Actions workflow **platform** (`.git
 1. In Azure, pick a **resource group** name, **region** (e.g. `westus3`), and a **globally unique** ACR short name (alphanumeric, e.g. `panchangstgacr`).
 2. In the GitHub repo, add **Actions variables**: `AZURE_RESOURCE_GROUP`, `AZURE_REGISTRY_NAME`, and optionally `AZURE_LOCATION`.
 3. Add **Actions secrets** for workload identity / service principal login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and MCP access (`MCP_SHARED_SECRET`). Full tables are in [`infra/README.md`](infra/README.md).
-4. Grant that identity permission on the subscription or resource group (e.g. Contributor).
+4. Grant that identity `Contributor` plus `User Access Administrator` on the target resource group. `User Access Administrator` is needed because the Bicep template assigns `AcrPull` to the Container Apps managed identity.
 
 ### Run deploy
 

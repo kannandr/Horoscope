@@ -42,7 +42,10 @@ Set **Secrets** for federated identity login (deploy job only):
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription |
 | `MCP_SHARED_SECRET` | Shared GUID password required by `/mcp` |
 
-Configure the Azure service principal with access to the subscription (e.g. Contributor on the resource group).
+Configure the Azure service principal with both roles on the target resource group:
+
+- `Contributor` to create/update Azure resources.
+- `User Access Administrator` to let Bicep assign `AcrPull` to the Container Apps managed identity.
 
 ## Deploy
 
