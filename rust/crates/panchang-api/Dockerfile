@@ -1,6 +1,7 @@
 FROM rust:bookworm AS build
 WORKDIR /src
 COPY rust/Cargo.toml ./Cargo.toml
+COPY rust/Cargo.lock ./Cargo.lock
 COPY rust/crates ./crates
 RUN cargo build --release -p panchang-api
 

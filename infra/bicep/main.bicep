@@ -18,6 +18,11 @@ param apiImage string
 @description('Container image for the MCP server.')
 param mcpImage string
 
+@secure()
+@minLength(16)
+@description('Shared password required by the public MCP endpoint. Pass it as Authorization: Bearer <value> or x-mcp-password.')
+param mcpSharedSecret string
+
 var prefix = 'panchang-${environmentName}'
 var apiName = '${prefix}-api'
 var webName = '${prefix}-web'
@@ -221,6 +226,12 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'http'
         allowInsecure: false
       }
+      secrets: [
+        {
+          name: 'mcp-shared-secret'
+          value: mcpSharedSecret
+        }
+      ]
       registries: [
         {
           server: acr.properties.loginServer
@@ -252,6 +263,10 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
               value: appInsights.properties.ConnectionString
             }
+            {
+              name: 'MCP_SHARED_SECRET'
+              secretRef: 'mcp-shared-secret'
+            }
           ]
           resources: {
             cpu: json('0.5')
@@ -263,8 +278,9 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-/* Explicitly disable Container Apps easy auth so web + MCP are anonymously reachable.
-   (Removing auth entirely would leave prior revisions’ auth settings on upgrade.) */
+/* Explicitly disable Container Apps easy auth. MCP remains protected by its
+   app-level shared password; removing auth entirely would leave prior
+   revisions' auth settings on upgrade. */
 resource webAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
   parent: web
   name: 'current'

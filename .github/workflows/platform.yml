@@ -35,7 +35,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 25
-      - run: npm install
+      - run: npm ci
         working-directory: web
       - run: npm run build
         working-directory: web
@@ -76,3 +76,4 @@ jobs:
           webImage="${REGISTRY_NAME}.azurecr.io/panchang-web:${GITHUB_SHA}"
           apiImage="${REGISTRY_NAME}.azurecr.io/panchang-api:${GITHUB_SHA}"
           mcpImage="${REGISTRY_NAME}.azurecr.io/panchang-mcp:${GITHUB_SHA}"
+          mcpSharedSecret="${{ secrets.MCP_SHARED_SECRET }}"

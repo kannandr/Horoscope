@@ -6,12 +6,13 @@ This folder contains the Container Apps deployment.
 
 - `web`: Next.js UI, **public** external ingress (Container Apps easy auth **disabled**).
 - `api`: Rust HTTP API, **internal** ingress (reachable only from inside the Container Apps environment, e.g. from `web`).
-- `mcp`: MCP endpoint at **`/mcp`**, **public** external ingress (no Azure gateway auth; secure at your own edge if needed).
+- `mcp`: MCP endpoint at **`/mcp`**, **public** external ingress with an app-level shared GUID password. Pass it as `Authorization: Bearer <value>` or `x-mcp-password: <value>`.
 
 ## Required parameters (Bicep)
 
 - `acrName`: **short name** of a Container Registry that already exists in the same resource group (5–50 alphanumeric characters, globally unique in Azure). The GitHub Action creates the registry on first run if it is missing.
 - `webImage`, `apiImage`, `mcpImage`: full ACR image references (e.g. `myregistry.azurecr.io/panchang-web:abc123`).
+- `mcpSharedSecret`: shared password stored as a Container Apps secret and exposed to the MCP container as `MCP_SHARED_SECRET`.
 
 The deployment intentionally creates no application database. State is limited to
 Container Apps runtime configuration, logs, metrics, and disposable in-process caches.
@@ -39,6 +40,7 @@ Set **Secrets** for federated identity login (deploy job only):
 | `AZURE_CLIENT_ID` | Service principal (or app) for OIDC / `az login` |
 | `AZURE_TENANT_ID` | Entra tenant |
 | `AZURE_SUBSCRIPTION_ID` | Azure subscription |
+| `MCP_SHARED_SECRET` | Shared GUID password required by `/mcp` |
 
 Configure the Azure service principal with access to the subscription (e.g. Contributor on the resource group).
 
@@ -72,5 +74,6 @@ az deployment group create \
     acrName="$AZURE_REGISTRY_NAME" \
     webImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-web:TAG" \
     apiImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-api:TAG" \
-    mcpImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-mcp:TAG"
+    mcpImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-mcp:TAG" \
+    mcpSharedSecret="$MCP_SHARED_SECRET"
 ```

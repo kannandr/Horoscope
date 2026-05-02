@@ -1,6 +1,6 @@
 use axum::{
     extract::Json,
-    http::StatusCode,
+    http::{header::AUTHORIZATION, HeaderMap, StatusCode},
     response::{IntoResponse, Json as JsonResponse, Response},
     routing::{get, post},
     Router,
@@ -59,7 +59,23 @@ async fn main() {
     axum::serve(listener, app).await.expect("serve MCP");
 }
 
-async fn mcp(Json(req): Json<JsonRpcRequest>) -> Response {
+async fn mcp(headers: HeaderMap, Json(req): Json<JsonRpcRequest>) -> Response {
+    let id = req.id.clone();
+    if !is_authorized(&headers) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            JsonResponse(err(
+                id,
+                -32001,
+                "MCP shared password is required".to_string(),
+                Some(json!({
+                    "hint": "Pass Authorization: Bearer <MCP_SHARED_SECRET> or x-mcp-password: <MCP_SHARED_SECRET>."
+                })),
+            )),
+        )
+            .into_response();
+    }
+
     let id = req.id.clone();
     let out = match req.method.as_str() {
         "initialize" => ok(id, json!({
@@ -95,6 +111,32 @@ async fn mcp(Json(req): Json<JsonRpcRequest>) -> Response {
         _ => err(id, -32601, format!("unknown MCP method: {}", req.method), None),
     };
     (StatusCode::OK, JsonResponse(out)).into_response()
+}
+
+fn is_authorized(headers: &HeaderMap) -> bool {
+    let Some(secret) = configured_shared_secret() else {
+        return true;
+    };
+
+    let bearer_ok = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.trim().strip_prefix("Bearer "))
+        .is_some_and(|candidate| candidate.trim() == secret);
+
+    let password_header_ok = headers
+        .get("x-mcp-password")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|candidate| candidate.trim() == secret);
+
+    bearer_ok || password_header_ok
+}
+
+fn configured_shared_secret() -> Option<String> {
+    std::env::var("MCP_SHARED_SECRET")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn call_tool(id: Option<Value>, params: Option<Value>) -> JsonRpcResponse {

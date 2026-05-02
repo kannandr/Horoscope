@@ -50,7 +50,8 @@ network I/O, not Panchang calculation. They live in the Next.js server in
 
 Azure Container Apps deployment (`infra/bicep`) runs **without** Container Apps easy auth:
 
-- **Web** and **MCP** use public HTTPS ingress; anyone can reach them unless you add your own protection (API gateway, IP rules, app-level auth).
+- **Web** uses public HTTPS ingress.
+- **MCP** uses public HTTPS ingress plus an app-level shared GUID password on `/mcp`. Clients pass it as `Authorization: Bearer <MCP_SHARED_SECRET>` or `x-mcp-password: <MCP_SHARED_SECRET>`. This is intentionally simple abuse resistance, not full identity management.
 - **API** stays on **internal** ingress only (called by the Next.js server using `PANCHANG_API_BASE_URL`).
 
 No application database is introduced in v1.

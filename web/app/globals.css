@@ -50,14 +50,13 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
 
-  /* Editorial display + utilitarian body, with system fallbacks if
-     next/font fails to load. */
+  /* Local/system font stacks keep Docker and CI builds offline-friendly. */
   --font-display:
-    var(--ff-display), "Fraunces", ui-serif, "New York", "Iowan Old Style",
-    "Charter", "Hoefler Text", "Times New Roman", Georgia, serif;
+    ui-serif, "New York", "Iowan Old Style", "Charter", "Hoefler Text",
+    "Times New Roman", Georgia, serif;
   --font-body:
-    var(--ff-body), Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
-    "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    system-ui, sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", Menlo, "Roboto Mono", "JetBrains Mono", monospace;
 

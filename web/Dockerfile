@@ -1,7 +1,7 @@
 FROM node:25-bookworm-slim AS deps
 WORKDIR /app
-COPY web/package.json ./
-RUN npm install
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
 
 FROM node:25-bookworm-slim AS build
 WORKDIR /app
