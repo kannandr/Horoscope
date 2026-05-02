@@ -1,0 +1,83 @@
+name: platform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Azure environment name
+        default: stg
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  LOCATION: ${{ vars.AZURE_LOCATION || 'westus3' }}
+  ENVIRONMENT_NAME: ${{ github.event.inputs.environment || 'stg' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo test --workspace
+        working-directory: rust
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+      - run: npm install
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ensure resource group and ACR
+        run: |
+          set -e
+          az group create --name "$RESOURCE_GROUP" --location "$LOCATION" 2>/dev/null || true
+          if ! az acr show --name "$REGISTRY_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+            az acr create --name "$REGISTRY_NAME" --resource-group "$RESOURCE_GROUP" --sku Basic
+          fi
+      - name: Build and push API image
+        run: az acr build --registry "$REGISTRY_NAME" --image "panchang-api:${GITHUB_SHA}" --file rust/crates/panchang-api/Dockerfile .
+      - name: Build and push MCP image
+        run: az acr build --registry "$REGISTRY_NAME" --image "panchang-mcp:${GITHUB_SHA}" --file rust/crates/panchang-mcp/Dockerfile .
+      - name: Build and push web image
+        run: az acr build --registry "$REGISTRY_NAME" --image "panchang-web:${GITHUB_SHA}" --file web/Dockerfile .
+      - name: Deploy Container Apps
+        run: >
+          az deployment group create
+          --resource-group "$RESOURCE_GROUP"
+          --template-file infra/bicep/main.bicep
+          --parameters
+          environmentName="$ENVIRONMENT_NAME"
+          location="$LOCATION"
+          acrName="$REGISTRY_NAME"
+          webImage="${REGISTRY_NAME}.azurecr.io/panchang-web:${GITHUB_SHA}"
+          apiImage="${REGISTRY_NAME}.azurecr.io/panchang-api:${GITHUB_SHA}"
+          mcpImage="${REGISTRY_NAME}.azurecr.io/panchang-mcp:${GITHUB_SHA}"
+          entraTenantId="${{ secrets.ENTRA_TENANT_ID }}"
+          webClientId="${{ secrets.WEB_AUTH_CLIENT_ID }}"
+          webClientSecret="${{ secrets.WEB_AUTH_CLIENT_SECRET }}"
+          mcpClientId="${{ secrets.MCP_AUTH_CLIENT_ID }}"
+          mcpClientSecret="${{ secrets.MCP_AUTH_CLIENT_SECRET }}"

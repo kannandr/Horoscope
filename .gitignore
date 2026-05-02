@@ -1,0 +1,37 @@
+# Dependencies & builds
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/target/
+*.wasm
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs & caches
+*.log
+.npm/
+.turbo/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+
+# Python (legacy / tooling)
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Debug / coverage
+coverage/
+.nyc_output/

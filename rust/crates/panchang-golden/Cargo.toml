@@ -1,0 +1,17 @@
+[package]
+name = "panchang-golden"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+panchang-core = { path = "../panchang-core" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+
+[[bin]]
+name = "compare-golden"
+path = "src/main.rs"

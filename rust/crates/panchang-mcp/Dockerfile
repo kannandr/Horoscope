@@ -1,0 +1,13 @@
+FROM rust:1.78-bookworm AS build
+WORKDIR /src
+COPY rust/Cargo.toml ./Cargo.toml
+COPY rust/crates ./crates
+RUN cargo build --release -p panchang-mcp
+
+FROM debian:bookworm-slim
+RUN useradd -r -u 10001 appuser && apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /src/target/release/panchang-mcp /usr/local/bin/panchang-mcp
+USER appuser
+ENV BIND_ADDR=0.0.0.0:8080
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/panchang-mcp"]
