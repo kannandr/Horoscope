@@ -46,13 +46,12 @@ Location services remain outside the deterministic engine because geocoding is
 network I/O, not Panchang calculation. They live in the Next.js server in
 `web/app/lib/location.ts`.
 
-## Private Beta Security
+## Hosted deployment security
 
-V1 uses Microsoft Entra ID through Azure Container Apps built-in authentication:
+Azure Container Apps deployment (`infra/bicep`) runs **without** Container Apps easy auth:
 
-- UI: browser redirect for sign-in.
-- MCP: bearer-token protected remote endpoint.
-- API: internal ingress only.
+- **Web** and **MCP** use public HTTPS ingress; anyone can reach them unless you add your own protection (API gateway, IP rules, app-level auth).
+- **API** stays on **internal** ingress only (called by the Next.js server using `PANCHANG_API_BASE_URL`).
 
 No application database is introduced in v1.
 
@@ -64,5 +63,5 @@ The intended future open-source units are:
 - `rust/crates/panchang-mcp`
 - Golden fixture tooling and protocol examples.
 
-Azure deployment details, private auth registrations, and hosted SaaS operations
-remain outside the OSS boundary unless intentionally released later.
+Azure deployment wiring and hosted operations remain outside the OSS boundary
+unless intentionally released later.

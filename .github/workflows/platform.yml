@@ -76,8 +76,3 @@ jobs:
           webImage="${REGISTRY_NAME}.azurecr.io/panchang-web:${GITHUB_SHA}"
           apiImage="${REGISTRY_NAME}.azurecr.io/panchang-api:${GITHUB_SHA}"
           mcpImage="${REGISTRY_NAME}.azurecr.io/panchang-mcp:${GITHUB_SHA}"
-          entraTenantId="${{ secrets.ENTRA_TENANT_ID }}"
-          webClientId="${{ secrets.WEB_AUTH_CLIENT_ID }}"
-          webClientSecret="${{ secrets.WEB_AUTH_CLIENT_SECRET }}"
-          mcpClientId="${{ secrets.MCP_AUTH_CLIENT_ID }}"
-          mcpClientSecret="${{ secrets.MCP_AUTH_CLIENT_SECRET }}"

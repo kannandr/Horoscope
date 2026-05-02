@@ -18,23 +18,6 @@ param apiImage string
 @description('Container image for the MCP server.')
 param mcpImage string
 
-@description('Microsoft Entra tenant ID used by Container Apps built-in auth.')
-param entraTenantId string
-
-@description('Client ID for the web app Entra app registration.')
-param webClientId string
-
-@secure()
-@description('Client secret for the web app Entra app registration.')
-param webClientSecret string
-
-@description('Client ID for the MCP Entra app registration.')
-param mcpClientId string
-
-@secure()
-@description('Client secret for the MCP Entra app registration.')
-param mcpClientSecret string
-
 var prefix = 'panchang-${environmentName}'
 var apiName = '${prefix}-api'
 var webName = '${prefix}-web'
@@ -179,12 +162,6 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: [
-        {
-          name: 'web-client-secret'
-          value: webClientSecret
-        }
-      ]
     }
     template: {
       scale: {
@@ -250,12 +227,6 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: identity.id
         }
       ]
-      secrets: [
-        {
-          name: 'mcp-client-secret'
-          value: mcpClientSecret
-        }
-      ]
     }
     template: {
       scale: {
@@ -292,26 +263,14 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+/* Explicitly disable Container Apps easy auth so web + MCP are anonymously reachable.
+   (Removing auth entirely would leave prior revisions’ auth settings on upgrade.) */
 resource webAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
   parent: web
   name: 'current'
   properties: {
     platform: {
-      enabled: true
-    }
-    globalValidation: {
-      unauthenticatedClientAction: 'RedirectToLoginPage'
-      redirectToProvider: 'azureactivedirectory'
-    }
-    identityProviders: {
-      azureActiveDirectory: {
-        enabled: true
-        registration: {
-          openIdIssuer: 'https://login.microsoftonline.com/${entraTenantId}/v2.0'
-          clientId: webClientId
-          clientSecretSettingName: 'web-client-secret'
-        }
-      }
+      enabled: false
     }
   }
 }
@@ -321,20 +280,7 @@ resource mcpAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
   name: 'current'
   properties: {
     platform: {
-      enabled: true
-    }
-    globalValidation: {
-      unauthenticatedClientAction: 'Return401'
-    }
-    identityProviders: {
-      azureActiveDirectory: {
-        enabled: true
-        registration: {
-          openIdIssuer: 'https://login.microsoftonline.com/${entraTenantId}/v2.0'
-          clientId: mcpClientId
-          clientSecretSettingName: 'mcp-client-secret'
-        }
-      }
+      enabled: false
     }
   }
 }

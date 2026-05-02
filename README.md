@@ -43,13 +43,13 @@ Infrastructure is in `infra/bicep/`. GitHub Actions workflow **platform** (`.git
 
 1. In Azure, pick a **resource group** name, **region** (e.g. `westus3`), and a **globally unique** ACR short name (alphanumeric, e.g. `panchangstgacr`).
 2. In the GitHub repo, add **Actions variables**: `AZURE_RESOURCE_GROUP`, `AZURE_REGISTRY_NAME`, and optionally `AZURE_LOCATION`.
-3. Add **Actions secrets** for workload identity / service principal login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and for Entra-backed Container Apps auth (`ENTRA_TENANT_ID`, `WEB_AUTH_*`, `MCP_AUTH_*`). Full tables are in [`infra/README.md`](infra/README.md).
+3. Add **Actions secrets** for workload identity / service principal login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`). Full tables are in [`infra/README.md`](infra/README.md).
 4. Grant that identity permission on the subscription or resource group (e.g. Contributor).
 
 ### Run deploy
 
 Open **Actions → platform → Run workflow**. Only the **workflow_dispatch** job deploys; merges to `main` still run tests only.
 
-After deployment, the **web** URL is in the ARM deployment outputs (`webUrl`; see `infra/README.md`). The web app uses Microsoft Entra sign-in (easy auth) per `infra/bicep/main.bicep`.
+After deployment, the **web** URL is in the ARM deployment outputs (`webUrl`; see `infra/README.md`). **Web and MCP are deployed without Container Apps login** (public HTTPS); add your own controls if you need access restriction.
 
 See [`infra/README.md`](infra/README.md) for CLI equivalents and parameter details.
