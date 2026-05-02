@@ -35,3 +35,6 @@ Thumbs.db
 # Debug / coverage
 coverage/
 .nyc_output/
+
+# Bicep emitted ARM (local `az bicep build`)
+infra/bicep/main.json
