@@ -1,0 +1,11 @@
+# Slimmer ACR/build context (Rust + web Dockerfiles run from repo root)
+.git
+**/.git
+**/node_modules
+**/.next
+**/target
+**/dist
+**/.venv
+**/__pycache__
+*.log
+.DS_Store

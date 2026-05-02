@@ -145,7 +145,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -216,7 +216,7 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -283,7 +283,7 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
