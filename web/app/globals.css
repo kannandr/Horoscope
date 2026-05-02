@@ -156,7 +156,30 @@ button:disabled { cursor: progress; opacity: 0.55; }
 .muted { color: var(--ink-3); }
 .muted-inline { color: var(--ink-3); }
 
-.app-shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+/* Stack header + main: do not use a 2-row grid with 5+ children or the 1fr row
+   lands on the subbar and pushes month/day content below the fold. */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.view-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.view-area > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 
 /* ============================================================
    App bar
@@ -945,6 +968,32 @@ button:disabled { cursor: progress; opacity: 0.55; }
 /* ============================================================
    Daily view
    ============================================================ */
+.day-detail-notice {
+  max-width: var(--maxw);
+  margin: 12px auto 0;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-card));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: var(--radius-md);
+}
+.day-detail-notice-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.day-detail-notice-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
 .daily {
   max-width: var(--maxw);
   margin: 0 auto;
@@ -1062,8 +1111,11 @@ button:disabled { cursor: progress; opacity: 0.55; }
 .daily-grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(420px, 1.1fr) minmax(360px, 0.9fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+.daily-card--full {
+  grid-column: 1 / -1;
 }
 .daily-card {
   background: var(--bg-card);
@@ -1162,6 +1214,274 @@ button:disabled { cursor: progress; opacity: 0.55; }
   color: var(--ink-3);
   font-weight: 600;
 }
+
+/* Transitions section merged into the Panchang card.
+   Visually a sub-section: dashed top divider, label header, then timeline. */
+.panchang-transitions {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-dashed);
+}
+.panchang-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.panchang-section-sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.timeline-item .name .action-badge {
+  text-transform: uppercase;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+}
+.timeline-item.starts .name .action-badge {
+  color: var(--start);
+  border-color: color-mix(in srgb, var(--start) 35%, var(--line));
+  background: color-mix(in srgb, var(--start) 8%, transparent);
+}
+.timeline-item.ends .name .action-badge {
+  color: var(--end);
+  border-color: color-mix(in srgb, var(--end) 35%, var(--line));
+  background: color-mix(in srgb, var(--end) 8%, transparent);
+}
+
+.tamil-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.tamil-dl dt {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0;
+  padding-top: 2px;
+}
+.tamil-dl dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 500;
+}
+.sunrise-angas {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.muted-inline { color: var(--ink-3); font-weight: 500; }
+.caution-card { border-color: color-mix(in srgb, var(--end) 22%, var(--line)); }
+.bless-card { border-color: color-mix(in srgb, var(--start) 25%, var(--line)); }
+.period-intro { font-size: 12.5px; margin: 0 0 12px; }
+.period-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.period-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+.period-row.inauspicious {
+  background: color-mix(in srgb, var(--end) 7%, var(--bg-card));
+}
+.period-row.auspicious {
+  background: color-mix(in srgb, var(--start) 8%, var(--bg-card));
+}
+.period-name { font-weight: 600; }
+.period-range {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* Auspicious times (NL muhurta search) */
+.auspicious-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 0 32px;
+}
+.auspicious-header { margin-bottom: 20px; }
+.auspicious-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+.auspicious-lede { margin: 0; font-size: 14px; line-height: 1.5; }
+.auspicious-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+.auspicious-query-label { display: flex; flex-direction: column; gap: 8px; }
+.auspicious-query {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--ink);
+  resize: vertical;
+}
+.auspicious-query:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.auspicious-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+.auspicious-start-date { display: flex; flex-direction: column; gap: 6px; }
+.auspicious-start-date input {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.auspicious-submit { min-width: 140px; }
+.auspicious-interpretation {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.auspicious-interpretation p { margin: 6px 0 0; }
+.auspicious-meta { font-size: 12.5px; margin-bottom: 12px; }
+.auspicious-empty { text-align: center; padding: 24px; }
+.auspicious-windows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auspicious-window-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.auspicious-window-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.auspicious-window-label {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+.auspicious-window-score {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--start);
+  letter-spacing: 0.04em;
+}
+.auspicious-window-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.auspicious-window-date-inline {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+}
+.auspicious-window-time-range { font-weight: 600; color: var(--ink); }
+.auspicious-window-duration { color: var(--ink-3); }
+
+/* Day-grouped windows: each date heads a stack of cards. */
+.auspicious-window-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.auspicious-window-group { display: flex; flex-direction: column; gap: 10px; }
+.auspicious-window-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 6px;
+  border-bottom: 1px dashed var(--line-dashed);
+}
+.auspicious-window-date {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.auspicious-window-count {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.auspicious-reasons,
+.auspicious-exclusions {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.auspicious-reasons { color: var(--ink); }
+.auspicious-exclusions { color: var(--ink-3); }
+.auspicious-hint { text-align: center; margin-top: 8px; }
 
 /* Vertical timeline of transitions */
 .timeline {

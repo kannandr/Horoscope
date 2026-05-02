@@ -6,7 +6,8 @@ use axum::{
     Router,
 };
 use panchang_core::{
-    civil_day, search_muhurta, snapshot, CivilDayRequest, MuhurtaSearchRequest, SnapshotRequest,
+    civil_day, panchang_day, search_muhurta, snapshot, CivilDayRequest, MuhurtaSearchRequest,
+    PanchangDayRequest, SnapshotRequest,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -15,6 +16,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
+    /// Protocol version field; deserialized to accept the JSON-RPC envelope
+    /// faithfully but not used at runtime (we always reply with "2.0").
+    #[allow(dead_code)]
     jsonrpc: Option<String>,
     id: Option<Value>,
     method: String,
@@ -42,7 +46,10 @@ struct JsonRpcError {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info,tower_http=info".into()))
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,tower_http=info".into()),
+        )
         .with(tracing_subscriber::fmt::layer().json())
         .init();
 
@@ -54,7 +61,9 @@ async fn main() {
         .layer(CorsLayer::permissive());
 
     let bind = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
-    let listener = tokio::net::TcpListener::bind(&bind).await.expect("bind MCP listener");
+    let listener = tokio::net::TcpListener::bind(&bind)
+        .await
+        .expect("bind MCP listener");
     tracing::info!(%bind, "panchang-mcp listening");
     axum::serve(listener, app).await.expect("serve MCP");
 }
@@ -78,37 +87,58 @@ async fn mcp(headers: HeaderMap, Json(req): Json<JsonRpcRequest>) -> Response {
 
     let id = req.id.clone();
     let out = match req.method.as_str() {
-        "initialize" => ok(id, json!({
-            "protocolVersion": "2025-06-18",
-            "serverInfo": { "name": "panchang-mcp", "version": env!("CARGO_PKG_VERSION") },
-            "capabilities": { "tools": {} }
-        })),
-        "tools/list" => ok(id, json!({
-            "tools": [
-                {
-                    "name": "calculate_panchang_snapshot",
-                    "description": "Calculate Panchang angas and local transition times for an observer and local datetime.",
-                    "inputSchema": snapshot_schema()
-                },
-                {
-                    "name": "list_civil_day_segments",
-                    "description": "List tithi and nakshatra intervals intersecting one local civil day.",
-                    "inputSchema": civil_day_schema()
-                },
-                {
-                    "name": "search_auspicious_windows",
-                    "description": "Search South Indian/Tamil-focused auspicious time windows with transparent scoring reasons.",
-                    "inputSchema": muhurta_schema()
-                },
-                {
-                    "name": "explain_auspicious_window",
-                    "description": "Explain the scoring reasons returned by search_auspicious_windows.",
-                    "inputSchema": { "type": "object", "properties": { "window": { "type": "object" } }, "required": ["window"] }
-                }
-            ]
-        })),
+        "initialize" => ok(
+            id,
+            json!({
+                "protocolVersion": "2025-06-18",
+                "serverInfo": { "name": "panchang-mcp", "version": env!("CARGO_PKG_VERSION") },
+                "capabilities": { "tools": {} }
+            }),
+        ),
+        "tools/list" => ok(
+            id,
+            json!({
+                "tools": [
+                    {
+                        "name": "calculate_panchang_snapshot",
+                        "description": "Calculate Panchang angas and local transition times for an observer and local datetime.",
+                        "inputSchema": snapshot_schema()
+                    },
+                    {
+                        "name": "list_civil_day_segments",
+                        "description": "List tithi, nakshatra, yoga, and karana intervals intersecting one local civil day.",
+                        "inputSchema": civil_day_schema()
+                    },
+                    {
+                        "name": "calculate_panchang_day",
+                        "description": "Calculate a rich Panchang day object with sunrise, vaara, angas, intervals, hora, rahu kalam, yama gandam, gulika, and abhijit muhurta.",
+                        "inputSchema": panchang_day_schema()
+                    },
+                    {
+                        "name": "list_inauspicious_periods",
+                        "description": "List South Indian/Tamil daytime caution periods for a date/location: rahu kalam, yama gandam, and gulika kalam.",
+                        "inputSchema": panchang_day_schema()
+                    },
+                    {
+                        "name": "search_auspicious_windows",
+                        "description": "Search South Indian/Tamil-focused auspicious time windows with transparent scoring reasons.",
+                        "inputSchema": muhurta_schema()
+                    },
+                    {
+                        "name": "explain_auspicious_window",
+                        "description": "Explain the scoring reasons returned by search_auspicious_windows.",
+                        "inputSchema": { "type": "object", "properties": { "window": { "type": "object" } }, "required": ["window"] }
+                    }
+                ]
+            }),
+        ),
         "tools/call" => call_tool(id, req.params),
-        _ => err(id, -32601, format!("unknown MCP method: {}", req.method), None),
+        _ => err(
+            id,
+            -32601,
+            format!("unknown MCP method: {}", req.method),
+            None,
+        ),
     };
     (StatusCode::OK, JsonResponse(out)).into_response()
 }
@@ -143,8 +173,14 @@ fn call_tool(id: Option<Value>, params: Option<Value>) -> JsonRpcResponse {
     let Some(params) = params else {
         return err(id, -32602, "missing params".to_string(), None);
     };
-    let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
-    let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+    let name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let args = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let result = match name {
         "calculate_panchang_snapshot" => serde_json::from_value::<SnapshotRequest>(args)
             .map_err(|e| e.to_string())
@@ -154,6 +190,24 @@ fn call_tool(id: Option<Value>, params: Option<Value>) -> JsonRpcResponse {
             .map_err(|e| e.to_string())
             .and_then(|r| civil_day(r).map_err(|e| e.to_string()))
             .and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())),
+        "calculate_panchang_day" => serde_json::from_value::<PanchangDayRequest>(args)
+            .map_err(|e| e.to_string())
+            .and_then(|r| panchang_day(r).map_err(|e| e.to_string()))
+            .and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())),
+        "list_inauspicious_periods" => serde_json::from_value::<PanchangDayRequest>(args)
+            .map_err(|e| e.to_string())
+            .and_then(|r| panchang_day(r).map_err(|e| e.to_string()))
+            .and_then(|r| {
+                serde_json::to_value(json!({
+                    "date": r.date,
+                    "timezone": r.timezone,
+                    "day_mode": r.day_mode,
+                    "sunrise_local": r.sunrise_local,
+                    "sunset_local": r.sunset_local,
+                    "periods": r.inauspicious_periods
+                }))
+                .map_err(|e| e.to_string())
+            }),
         "search_auspicious_windows" => serde_json::from_value::<MuhurtaSearchRequest>(args)
             .map_err(|e| e.to_string())
             .and_then(|r| search_muhurta(r).map_err(|e| e.to_string()))
@@ -168,17 +222,39 @@ fn call_tool(id: Option<Value>, params: Option<Value>) -> JsonRpcResponse {
     };
     match result {
         Ok(value) if name == "explain_auspicious_window" => ok(id, value),
-        Ok(value) => ok(id, json!({ "content": [{ "type": "text", "text": value.to_string() }], "structuredContent": value })),
-        Err(message) => err(id, -32000, "tool call failed".to_string(), Some(json!({ "message": message }))),
+        Ok(value) => ok(
+            id,
+            json!({ "content": [{ "type": "text", "text": value.to_string() }], "structuredContent": value }),
+        ),
+        Err(message) => err(
+            id,
+            -32000,
+            "tool call failed".to_string(),
+            Some(json!({ "message": message })),
+        ),
     }
 }
 
 fn ok(id: Option<Value>, result: Value) -> JsonRpcResponse {
-    JsonRpcResponse { jsonrpc: "2.0", id, result: Some(result), error: None }
+    JsonRpcResponse {
+        jsonrpc: "2.0",
+        id,
+        result: Some(result),
+        error: None,
+    }
 }
 
 fn err(id: Option<Value>, code: i32, message: String, data: Option<Value>) -> JsonRpcResponse {
-    JsonRpcResponse { jsonrpc: "2.0", id, result: None, error: Some(JsonRpcError { code, message, data }) }
+    JsonRpcResponse {
+        jsonrpc: "2.0",
+        id,
+        result: None,
+        error: Some(JsonRpcError {
+            code,
+            message,
+            data,
+        }),
+    }
 }
 
 fn snapshot_schema() -> Value {
@@ -204,6 +280,22 @@ fn civil_day_schema() -> Value {
             "timezone": { "type": "string" },
             "latitude": { "type": "number" },
             "longitude": { "type": "number" },
+            "ayanamsha": { "type": "string", "enum": ["lahiri", "lahiri_alt_stub", "raman"] },
+            "engine": { "type": "string", "enum": ["meeus", "surya_mean"] }
+        },
+        "required": ["date", "timezone", "latitude", "longitude"]
+    })
+}
+
+fn panchang_day_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "date": { "type": "string", "description": "YYYY-MM-DD" },
+            "timezone": { "type": "string", "description": "IANA timezone" },
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" },
+            "day_mode": { "type": "string", "enum": ["civil_midnight", "sunrise_day"], "description": "civil_midnight preserves UI day semantics; sunrise_day anchors the Panchang day from sunrise to next sunrise." },
             "ayanamsha": { "type": "string", "enum": ["lahiri", "lahiri_alt_stub", "raman"] },
             "engine": { "type": "string", "enum": ["meeus", "surya_mean"] }
         },

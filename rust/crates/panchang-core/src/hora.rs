@@ -6,7 +6,10 @@ use crate::types::HoraInterval;
 
 fn weekday_at_jd(jd: f64, tz: Tz) -> usize {
     use chrono::Datelike;
-    time::datetime_utc_from_jd(jd).with_timezone(&tz).weekday().num_days_from_monday() as usize
+    time::datetime_utc_from_jd(jd)
+        .with_timezone(&tz)
+        .weekday()
+        .num_days_from_monday() as usize
 }
 
 fn first_ruler_for_weekday(weekday: usize) -> &'static str {
@@ -22,7 +25,10 @@ fn first_ruler_for_weekday(weekday: usize) -> &'static str {
 }
 
 fn sequence_start(first: &str) -> usize {
-    names::PLANET_HORA_SEQUENCE.iter().position(|x| *x == first).unwrap_or(0)
+    names::PLANET_HORA_SEQUENCE
+        .iter()
+        .position(|x| *x == first)
+        .unwrap_or(0)
 }
 
 pub fn build_hora_table(sr: f64, ss: f64, next_sr: f64, tz: Tz) -> Vec<HoraInterval> {

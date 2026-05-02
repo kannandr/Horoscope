@@ -56,6 +56,11 @@ Azure Container Apps deployment (`infra/bicep`) runs **without** Container Apps 
 
 No application database is introduced in v1.
 
+## Third-party boundaries (calculations stay local)
+
+- **Ephemeris, angas, sunrise/sunset, hora, Tamil calendar segments, muhurta search**: computed **only** inside `panchang-core` (Rust), reached via **`panchang-api`** or MCP. No external horoscope, astrology, or calendar SaaS is called for those results.
+- **Optional network I/O**: address search / reverse geocode uses OpenStreetMap **Nominatim** (`web/app/lib/location.ts`) to resolve **place names to latitude, longitude, and timezone**. That is geography lookup only; Panchang payloads are not sent to third parties.
+
 ## Open Source Boundary
 
 The intended future open-source units are:

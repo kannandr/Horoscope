@@ -15,12 +15,22 @@ pub struct TropicalLongitudes {
 
 pub fn reduce_deg(x: f64) -> f64 {
     let y = x % 360.0;
-    if y < 0.0 { y + 360.0 } else { y }
+    if y < 0.0 {
+        y + 360.0
+    } else {
+        y
+    }
 }
 
-fn radians(x: f64) -> f64 { x * PI / 180.0 }
-fn degrees(x: f64) -> f64 { x * 180.0 / PI }
-fn centuries_j2000(jd: f64) -> f64 { (jd - 2451545.0) / 36525.0 }
+fn radians(x: f64) -> f64 {
+    x * PI / 180.0
+}
+fn degrees(x: f64) -> f64 {
+    x * 180.0 / PI
+}
+fn centuries_j2000(jd: f64) -> f64 {
+    (jd - 2451545.0) / 36525.0
+}
 
 pub fn sun_apparent_longitude_deg(jd: f64) -> f64 {
     let t = centuries_j2000(jd);
@@ -42,16 +52,27 @@ pub fn mean_sun_geometric_longitude_deg(jd: f64) -> f64 {
 
 pub fn mean_moon_longitude_deg(jd: f64) -> f64 {
     let t = centuries_j2000(jd);
-    reduce_deg(218.3164477 + (481267.88123421 + (-0.0015786 + (1.0 / 538841.0 - t / 65194000.0) * t) * t) * t)
+    reduce_deg(
+        218.3164477
+            + (481267.88123421 + (-0.0015786 + (1.0 / 538841.0 - t / 65194000.0) * t) * t) * t,
+    )
 }
 
 fn moon_mean_elements(jd: f64) -> (f64, f64, f64, f64, f64, f64) {
     let t = centuries_j2000(jd);
     let lp = mean_moon_longitude_deg(jd);
-    let d = reduce_deg(297.8501921 + (445267.1114034 + (-0.0018819 + (1.0 / 545868.0 - t / 113065000.0) * t) * t) * t);
+    let d = reduce_deg(
+        297.8501921
+            + (445267.1114034 + (-0.0018819 + (1.0 / 545868.0 - t / 113065000.0) * t) * t) * t,
+    );
     let m_sun = reduce_deg(357.5291092 + (35999.0502909 + (-0.0001536 + t / 24490000.0) * t) * t);
-    let mp = reduce_deg(134.9633964 + (477198.8675055 + (0.0087414 + (1.0 / 69699.9 + t / 14712000.0) * t) * t) * t);
-    let f = reduce_deg(93.2720950 + (483202.0175233 + (-0.0036539 + (-1.0 / 3526000.0 + t / 863310000.0) * t) * t) * t);
+    let mp = reduce_deg(
+        134.9633964 + (477198.8675055 + (0.0087414 + (1.0 / 69699.9 + t / 14712000.0) * t) * t) * t,
+    );
+    let f = reduce_deg(
+        93.2720950
+            + (483202.0175233 + (-0.0036539 + (-1.0 / 3526000.0 + t / 863310000.0) * t) * t) * t,
+    );
     let e = 1.0 + (-0.002516 - 0.0000074 * t) * t;
     (lp, d, m_sun, mp, f, e)
 }
@@ -114,11 +135,21 @@ pub fn moon_geocentric_ecliptic_deg(jd: f64) -> (f64, f64) {
 fn nutation_arguments(jd: f64) -> [f64; 5] {
     let t = centuries_j2000(jd);
     [
-        radians(reduce_deg(297.85036 + t * (445267.111480 + t * (-0.0019142 + t / 189474.0)))),
-        radians(reduce_deg(357.52772 + t * (35999.050340 + t * (-0.0001603 - t / 300000.0)))),
-        radians(reduce_deg(134.96298 + t * (477198.867398 + t * (0.0086972 + t / 56250.0)))),
-        radians(reduce_deg(93.27191 + t * (483202.017538 + t * (-0.0036825 + t / 327270.0)))),
-        radians(reduce_deg(125.04452 + t * (-1934.136261 + t * (0.0020708 + t / 450000.0)))),
+        radians(reduce_deg(
+            297.85036 + t * (445267.111480 + t * (-0.0019142 + t / 189474.0)),
+        )),
+        radians(reduce_deg(
+            357.52772 + t * (35999.050340 + t * (-0.0001603 - t / 300000.0)),
+        )),
+        radians(reduce_deg(
+            134.96298 + t * (477198.867398 + t * (0.0086972 + t / 56250.0)),
+        )),
+        radians(reduce_deg(
+            93.27191 + t * (483202.017538 + t * (-0.0036825 + t / 327270.0)),
+        )),
+        radians(reduce_deg(
+            125.04452 + t * (-1934.136261 + t * (0.0020708 + t / 450000.0)),
+        )),
     ]
 }
 
@@ -146,7 +177,10 @@ pub fn nutation_obliquity_arcsec(jd: f64) -> f64 {
         for j in 0..5 {
             arg += row[j] * args[j];
         }
-        let coeff_row = NUTATION_COSINE_COEF_TABLE.get(i).copied().unwrap_or([0.0, 0.0]);
+        let coeff_row = NUTATION_COSINE_COEF_TABLE
+            .get(i)
+            .copied()
+            .unwrap_or([0.0, 0.0]);
         let coeff = coeff_row[0] + coeff_row[1] * t;
         deps += (coeff * arg.cos()) / 10000.0;
     }
@@ -163,7 +197,11 @@ pub fn apparent_tropical_longitudes(jd: f64, engine: EngineId) -> TropicalLongit
     match engine {
         EngineId::Meeus => {
             let (moon_lon_deg, moon_lat_deg) = moon_apparent_longitude_deg(jd);
-            TropicalLongitudes { sun_deg: sun_apparent_longitude_deg(jd), moon_lon_deg, moon_lat_deg }
+            TropicalLongitudes {
+                sun_deg: sun_apparent_longitude_deg(jd),
+                moon_lon_deg,
+                moon_lat_deg,
+            }
         }
         EngineId::SuryaMean => TropicalLongitudes {
             sun_deg: mean_sun_geometric_longitude_deg(jd),
@@ -175,7 +213,13 @@ pub fn apparent_tropical_longitudes(jd: f64, engine: EngineId) -> TropicalLongit
 
 fn mean_obliquity_deg(jd: f64) -> f64 {
     let u = (jd - 2451545.0) / 3652500.0;
-    let delta_arcsec = u * (-4680.93 + u * (-1.55 + u * (1999.25 + u * (-51.38 + u * (-249.67 + u * (-39.05 + u * (7.12 + u * (27.87 + u * (5.79 + u * 2.45)))))))));
+    let delta_arcsec = u
+        * (-4680.93
+            + u * (-1.55
+                + u * (1999.25
+                    + u * (-51.38
+                        + u * (-249.67
+                            + u * (-39.05 + u * (7.12 + u * (27.87 + u * (5.79 + u * 2.45)))))))));
     23.0 + 26.0 / 60.0 + 21.448 / 3600.0 + delta_arcsec / 3600.0
 }
 
@@ -185,7 +229,10 @@ fn true_obliquity_deg(jd: f64) -> f64 {
 
 fn gmst_deg(jd: f64) -> f64 {
     let t = centuries_j2000(jd);
-    reduce_deg(280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * t * t - (t * t * t) / 38710000.0)
+    reduce_deg(
+        280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * t * t
+            - (t * t * t) / 38710000.0,
+    )
 }
 
 pub fn sun_altitude_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
@@ -199,7 +246,11 @@ pub fn sun_altitude_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
     let lst = reduce_deg(gmst_deg(jd) + lon_deg);
     let h = radians(reduce_deg(lst - ra));
     let latr = radians(lat_deg);
-    degrees((latr.sin() * dec.sin() + latr.cos() * dec.cos() * h.cos()).clamp(-1.0, 1.0).asin())
+    degrees(
+        (latr.sin() * dec.sin() + latr.cos() * dec.cos() * h.cos())
+            .clamp(-1.0, 1.0)
+            .asin(),
+    )
 }
 
 #[cfg(test)]

@@ -1,10 +1,26 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { CivilDayResponse, MonthResponse, Observer, SnapshotResponse } from "@/app/lib/api";
+import type {
+  CivilDayResponse,
+  MonthResponse,
+  MuhurtaResponse,
+  Observer,
+  PanchangDayResponse,
+  SnapshotResponse
+} from "@/app/lib/api";
 import { timeOnly } from "@/app/lib/api";
+import { AuspiciousView } from "@/app/components/AuspiciousView";
+import { parseMuhurtaQuery } from "@/app/lib/muhurtaParse";
+import {
+  panchangDayFromCivilAndSnapshot,
+  panchangDayFromSnapshotOnly
+} from "@/app/lib/panchangDayFallback";
 
-type View = "month" | "week" | "day";
+type View = "month" | "week" | "day" | "auspicious";
+
+/** Short banner when full-day API is unavailable (still all-local Rust). */
+type DayDetailNotice = { title: string; body: string };
 
 type GeocodeResponse = {
   hits: Array<{ label: string; latitude: number; longitude: number; timezone?: string | null }>;
@@ -178,10 +194,15 @@ export default function PanchangApp() {
   const [placeLabel, setPlaceLabel] = useState("Livermore, California, United States");
   const [view, setView] = useState<View>("month");
   const [month, setMonth] = useState<MonthResponse | null>(null);
-  const [civilDay, setCivilDay] = useState<CivilDayResponse | null>(null);
+  const [panchangDay, setPanchangDay] = useState<PanchangDayResponse | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotResponse | null>(null);
+  const [muhurta, setMuhurta] = useState<MuhurtaResponse | null>(null);
+  const [muhurtaQuery, setMuhurtaQuery] = useState(
+    "Find auspicious daytime windows this week for an important event. Prefer at least 45 minutes."
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dayDetailNotice, setDayDetailNotice] = useState<DayDetailNotice | null>(null);
   const didAutoLoad = useRef(false);
 
   async function fetchMonth(year: number, month_: number, obs: Observer): Promise<MonthResponse> {
@@ -196,6 +217,7 @@ export default function PanchangApp() {
   ) {
     setBusy(true);
     setError(null);
+    setDayDetailNotice(null);
     try {
       if (nextView === "month") {
         const m = isoMonth(nextDate);
@@ -226,12 +248,62 @@ export default function PanchangApp() {
           setMonth(merged);
         }
       } else if (nextView === "day") {
-        const [dayData, snap] = await Promise.all([
-          postJson<CivilDayResponse>("/api/panchang/civil-day", { date: nextDate, ...nextObserver }),
-          postJson<SnapshotResponse>("/api/panchang/snapshot", { when_local: `${nextDate}T${nextTime}`, ...nextObserver })
-        ]);
-        setCivilDay(dayData);
+        const whenLocal = `${nextDate}T${nextTime}`;
+        const snap = await postJson<SnapshotResponse>("/api/panchang/snapshot", {
+          when_local: whenLocal,
+          ...nextObserver
+        });
+        let pd: PanchangDayResponse;
+        let detailNotice: DayDetailNotice | null = null;
+        try {
+          pd = await postJson<PanchangDayResponse>("/api/panchang/day", {
+            date: nextDate,
+            day_mode: "civil_midnight",
+            ...nextObserver
+          });
+        } catch (dayErr) {
+          const dayMsg = dayErr instanceof Error ? dayErr.message : "Day request failed";
+          const looksLikeStaleBinary = /\b404\b/.test(dayMsg);
+          try {
+            const civil = await postJson<CivilDayResponse>("/api/panchang/civil-day", {
+              date: nextDate,
+              ...nextObserver
+            });
+            pd = panchangDayFromCivilAndSnapshot(civil, snap);
+            detailNotice = looksLikeStaleBinary
+              ? {
+                  title: "Local Panchang server is out of date",
+                  body: "Tithi and Nakshatra ranges are showing, but Tamil calendar and the day caution windows need a newer build of the local engine. Restart it with: cd rust && cargo run -p panchang-api --release"
+                }
+              : {
+                  title: "Partial day detail",
+                  body: "Tithi and Nakshatra ranges are showing. Tamil calendar and the day caution windows did not load this round; try Refresh in a few seconds."
+                };
+          } catch {
+            pd = panchangDayFromSnapshotOnly(nextDate, nextObserver.timezone, snap);
+            detailNotice = {
+              title: "Local Panchang server is unreachable",
+              body: `Showing only the snapshot Panchang for the time picker. Start the local engine with:  cd rust && cargo run -p panchang-api --release   (raw error: ${dayMsg})`
+            };
+          }
+        }
         setSnapshot(snap);
+        setPanchangDay(pd);
+        setDayDetailNotice(detailNotice);
+      } else if (nextView === "auspicious") {
+        const parsed = parseMuhurtaQuery(muhurtaQuery, nextDate);
+        const data = await postJson<MuhurtaResponse>("/api/muhurta/search", {
+          date_start: parsed.date_start,
+          date_end: parsed.date_end,
+          timezone: nextObserver.timezone,
+          latitude: nextObserver.latitude,
+          longitude: nextObserver.longitude,
+          purpose_preset: parsed.purpose_preset,
+          min_duration_minutes: parsed.min_duration_minutes,
+          ayanamsha: nextObserver.ayanamsha,
+          engine: nextObserver.engine
+        });
+        setMuhurta(data);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Calculation failed");
@@ -244,6 +316,7 @@ export default function PanchangApp() {
     let next = date;
     if (view === "month") next = addMonthsIso(date, -1);
     else if (view === "week") next = addDaysIso(date, -7);
+    else if (view === "auspicious") next = addDaysIso(date, -7);
     else next = addDaysIso(date, -1);
     setDate(next);
     void compute(view, next);
@@ -253,6 +326,7 @@ export default function PanchangApp() {
     let next = date;
     if (view === "month") next = addMonthsIso(date, 1);
     else if (view === "week") next = addDaysIso(date, 7);
+    else if (view === "auspicious") next = addDaysIso(date, 7);
     else next = addDaysIso(date, 1);
     setDate(next);
     void compute(view, next);
@@ -276,6 +350,31 @@ export default function PanchangApp() {
     if (view === "day") void compute("day", date, observer, nowT);
   }
 
+  async function runMuhurtaSearch(queryText: string) {
+    setMuhurtaQuery(queryText);
+    setBusy(true);
+    setError(null);
+    try {
+      const parsed = parseMuhurtaQuery(queryText, date);
+      const data = await postJson<MuhurtaResponse>("/api/muhurta/search", {
+        date_start: parsed.date_start,
+        date_end: parsed.date_end,
+        timezone: observer.timezone,
+        latitude: observer.latitude,
+        longitude: observer.longitude,
+        purpose_preset: parsed.purpose_preset,
+        min_duration_minutes: parsed.min_duration_minutes,
+        ayanamsha: observer.ayanamsha,
+        engine: observer.engine
+      });
+      setMuhurta(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Muhurta search failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /* Switch the active view. When entering the day view in live mode we
      also snap the snapshot time to "now" in the observer's timezone so the
      first fetch reflects the real wall clock instead of whatever stale time
@@ -291,7 +390,7 @@ export default function PanchangApp() {
     }
   }
 
-  /* Keyboard shortcuts: M/W/D for views, T for today, ←/→ for prev/next, / to focus search.
+  /* Keyboard shortcuts: M/W/D/A for views, T for today, ←/→ for prev/next, / to focus search.
      Inputs and contenteditable nodes are skipped so users can type normally. */
   const goPrevRef = useRef(goPrev);
   const goNextRef = useRef(goNext);
@@ -332,6 +431,8 @@ export default function PanchangApp() {
         switchViewRef.current("week");
       } else if (k === "d") {
         switchViewRef.current("day");
+      } else if (k === "a") {
+        switchViewRef.current("auspicious");
       } else if (k === "t") {
         goTodayRef.current();
       } else if (e.key === "ArrowLeft") {
@@ -493,6 +594,12 @@ export default function PanchangApp() {
   const heading = useMemo(() => {
     const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) =>
       dateForDisplay(iso).toLocaleString(undefined, { ...opts, timeZone: "UTC" });
+    if (view === "auspicious") {
+      return {
+        title: "Auspicious times",
+        sub: "Tamil / South Indian preset · describe your event below"
+      };
+    }
     if (view === "day") {
       return {
         title: fmt(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
@@ -620,14 +727,31 @@ export default function PanchangApp() {
         </div>
       </header>
 
+      <div className="app-main">
       <section className="subbar">
         <div className="subbar-nav" aria-label="Date navigation">
           <button
             type="button"
             className="nav-btn"
             onClick={goPrev}
-            title={view === "month" ? "Previous month" : view === "week" ? "Previous week" : "Previous day"}
-            aria-label={view === "month" ? "Previous month" : view === "week" ? "Previous week" : "Previous day"}
+            title={
+              view === "month"
+                ? "Previous month"
+                : view === "week"
+                  ? "Previous week"
+                  : view === "auspicious"
+                    ? "Shift window earlier"
+                    : "Previous day"
+            }
+            aria-label={
+              view === "month"
+                ? "Previous month"
+                : view === "week"
+                  ? "Previous week"
+                  : view === "auspicious"
+                    ? "Shift search window earlier"
+                    : "Previous day"
+            }
           >
             ‹
           </button>
@@ -643,8 +767,24 @@ export default function PanchangApp() {
             type="button"
             className="nav-btn"
             onClick={goNext}
-            title={view === "month" ? "Next month" : view === "week" ? "Next week" : "Next day"}
-            aria-label={view === "month" ? "Next month" : view === "week" ? "Next week" : "Next day"}
+            title={
+              view === "month"
+                ? "Next month"
+                : view === "week"
+                  ? "Next week"
+                  : view === "auspicious"
+                    ? "Shift window later"
+                    : "Next day"
+            }
+            aria-label={
+              view === "month"
+                ? "Next month"
+                : view === "week"
+                  ? "Next week"
+                  : view === "auspicious"
+                    ? "Shift search window later"
+                    : "Next day"
+            }
           >
             ›
           </button>
@@ -654,7 +794,7 @@ export default function PanchangApp() {
           <span className="month-sub">{heading.sub}</span>
         </h1>
         <nav className="seg" role="tablist" aria-label="Calendar views">
-          {(["month", "week", "day"] as View[]).map((v) => (
+          {(["month", "week", "day", "auspicious"] as View[]).map((v) => (
             <button
               key={v}
               role="tab"
@@ -662,7 +802,7 @@ export default function PanchangApp() {
               tabIndex={view === v ? 0 : -1}
               onClick={() => switchView(v)}
             >
-              {v[0].toUpperCase() + v.slice(1)}
+              {v === "auspicious" ? "Auspicious" : v[0].toUpperCase() + v.slice(1)}
             </button>
           ))}
         </nav>
@@ -675,15 +815,17 @@ export default function PanchangApp() {
       )}
 
       {(view === "month" || view === "week") && <Legend />}
-      <div key={view} className="view-fade">
+      <div key={view} className="view-fade view-area">
         {view === "month" && (
           <MonthGrid month={month} anchorDate={date} todayIso={todayIso} busy={busy} />
         )}
         {view === "week" && <WeekStrip days={weekDays} todayIso={todayIso} busy={busy} />}
         {view === "day" && (
           <DailyView
-            day={civilDay}
+            panchangDay={panchangDay}
             snapshot={snapshot}
+            dayDetailNotice={dayDetailNotice}
+            dayDetailDegraded={dayDetailNotice !== null}
             date={date}
             time={time}
             timezone={observer.timezone}
@@ -706,6 +848,20 @@ export default function PanchangApp() {
             busy={busy}
           />
         )}
+        {view === "auspicious" && (
+          <AuspiciousView
+            anchorDate={date}
+            observer={observer}
+            result={muhurta}
+            busy={busy}
+            onSearch={runMuhurtaSearch}
+            onAnchorDateChange={(iso) => {
+              setDate(iso);
+              void compute("auspicious", iso);
+            }}
+          />
+        )}
+      </div>
       </div>
     </main>
   );
@@ -1062,8 +1218,10 @@ function localDate(value: string): string {
 }
 
 function DailyView({
-  day,
+  panchangDay,
   snapshot,
+  dayDetailNotice,
+  dayDetailDegraded,
   date,
   time,
   timezone,
@@ -1076,8 +1234,10 @@ function DailyView({
   onCompute,
   busy
 }: {
-  day: CivilDayResponse | null;
+  panchangDay: PanchangDayResponse | null;
   snapshot: SnapshotResponse | null;
+  dayDetailNotice: DayDetailNotice | null;
+  dayDetailDegraded: boolean;
   date: string;
   time: string;
   timezone: string;
@@ -1090,7 +1250,7 @@ function DailyView({
   onCompute: () => void;
   busy: boolean;
 }) {
-  if (!day || !snapshot) {
+  if (!panchangDay || !snapshot) {
     return (
       <section className="daily">
         <DailyNav
@@ -1109,8 +1269,9 @@ function DailyView({
       </section>
     );
   }
-  const dayHoras = snapshot.hora.filter((h) => h.is_daytime);
-  const nightHoras = snapshot.hora.filter((h) => !h.is_daytime);
+  const horaList = panchangDay.hora.length > 0 ? panchangDay.hora : snapshot.hora;
+  const dayHoras = horaList.filter((h) => h.is_daytime);
+  const nightHoras = horaList.filter((h) => !h.is_daytime);
   const karanaRange =
     snapshot.karana_start_local && snapshot.karana_end_local
       ? `${timeOnly(snapshot.karana_start_local)} – ${timeOnly(snapshot.karana_end_local)}`
@@ -1118,10 +1279,11 @@ function DailyView({
   const sunrise = jdToLocalTime(snapshot.sunrise_jd_ut, timezone);
   const sunset = jdToLocalTime(snapshot.sunset_jd_ut, timezone);
   const transitions = transitionEventsForDate({
-    date: day.date,
-    tithi_intervals: day.tithi_intervals,
-    nakshatra_intervals: day.nakshatra_intervals
+    date: panchangDay.date,
+    tithi_intervals: panchangDay.tithi_intervals,
+    nakshatra_intervals: panchangDay.nakshatra_intervals
   });
+  const tamil = panchangDay.tamil_calendar;
   return (
     <section className="daily" aria-busy={busy}>
       <DailyNav
@@ -1136,8 +1298,14 @@ function DailyView({
         onCompute={onCompute}
         busy={busy}
       />
+      {dayDetailNotice ? (
+        <aside className="day-detail-notice" role="status">
+          <strong className="day-detail-notice-title">{dayDetailNotice.title}</strong>
+          <p className="day-detail-notice-body">{dayDetailNotice.body}</p>
+        </aside>
+      ) : null}
       <div className="daily-grid">
-        <article className="daily-card panchang-card">
+        <article className="daily-card panchang-card daily-card--full">
           <h2>Panchang</h2>
           <div className="anga-grid">
             <div className="anga-tile">
@@ -1191,33 +1359,109 @@ function DailyView({
               </span>
             </footer>
           ) : null}
+          <section className="panchang-transitions" aria-label="Tithi and Nakshatra transitions">
+            <header className="panchang-section-head">
+              <span className="anga-label">Transitions</span>
+              <span className="panchang-section-sub">Tithi · Nakshatra start / end (local time)</span>
+            </header>
+            {transitions.length === 0 ? (
+              <p className="muted">No transitions fall within this civil day.</p>
+            ) : (
+              <ol className="timeline">
+                {transitions.map((tx, idx) => (
+                  <li
+                    key={`${tx.kind}-${tx.action}-${tx.name}-${tx.timeLocal}-${idx}`}
+                    className={`timeline-item ${tx.kind} ${tx.action}`}
+                  >
+                    <span className="time">
+                      <span className={`marker ${tx.action === "starts" ? "start" : "end"}`} aria-hidden />
+                      {timeOnly(tx.timeLocal)}
+                    </span>
+                    <span className="name">
+                      <span className="glyph" aria-hidden>
+                        {tx.kind === "tithi" ? tithiGlyph(tx.name) : NAKSHATRA_GLYPH}
+                      </span>{" "}
+                      <b>{tx.name}</b>
+                      <small className="action-badge">{tx.action}</small>
+                      {tx.pada ? <small>pada {tx.pada}</small> : null}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </article>
         <article className="daily-card">
-          <h2>Transitions</h2>
-          {transitions.length === 0 ? (
-            <p className="muted">No transitions fall within this civil day.</p>
-          ) : (
-            <ol className="timeline">
-              {transitions.map((tx, idx) => (
-                <li
-                  key={`${tx.kind}-${tx.action}-${tx.name}-${tx.timeLocal}-${idx}`}
-                  className={`timeline-item ${tx.kind} ${tx.action}`}
-                >
-                  <span className="time">
-                    <span className={`marker ${tx.action === "starts" ? "start" : "end"}`} aria-hidden />
-                    {timeOnly(tx.timeLocal)}
-                  </span>
-                  <span className="name">
-                    <span className="glyph" aria-hidden>
-                      {tx.kind === "tithi" ? tithiGlyph(tx.name) : NAKSHATRA_GLYPH}
-                    </span>{" "}
-                    <b>{tx.name}</b>
-                    {tx.pada ? <small>pada {tx.pada}</small> : null}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          <h2>Tamil calendar</h2>
+          {dayDetailDegraded ? (
+            <p className="muted period-intro">Labels below fill in once the full local day run is available.</p>
+          ) : null}
+          <dl className="tamil-dl">
+            <dt>Weekday</dt>
+            <dd>{tamil.weekday_name_tamil}</dd>
+            <dt>Solar month</dt>
+            <dd>
+              {tamil.solar_month_name} ({tamil.solar_month_name_tamil})
+            </dd>
+            <dt>Tamil year</dt>
+            <dd>{tamil.tamil_year_name}</dd>
+            <dt>Ayana · Ritu</dt>
+            <dd>
+              {tamil.ayana} · {tamil.ritu}
+            </dd>
+            <dt>Vaara</dt>
+            <dd>
+              {panchangDay.vaara_civil_local}
+              {panchangDay.vaara_at_sunrise ? (
+                <span className="muted-inline"> · at sunrise: {panchangDay.vaara_at_sunrise}</span>
+              ) : null}
+            </dd>
+          </dl>
+          {panchangDay.angas_at_sunrise ? (
+            <p className="sunrise-angas muted">
+              Angas at sunrise: {panchangDay.angas_at_sunrise.tithi_name}, {panchangDay.angas_at_sunrise.nakshatra_name}{" "}
+              · pada {panchangDay.angas_at_sunrise.nakshatra_pada}
+            </p>
+          ) : null}
+        </article>
+        <article className="daily-card caution-card">
+          <h2>Day cautions</h2>
+          <p className="muted period-intro">Daytime Rahu Kalam, Yama Gandam, and Gulika Kalam (South Indian division).</p>
+          <ul className="period-list">
+            {panchangDay.inauspicious_periods.map((p) => (
+              <li key={p.code} className={`period-row ${p.category}`}>
+                <span className="period-name">{p.name}</span>
+                <span className="period-range">
+                  {timeOnly(p.start_local)} – {timeOnly(p.end_local)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {panchangDay.inauspicious_periods.length === 0 ? (
+            <p className="muted">
+              {dayDetailDegraded
+                ? "Included when the full local day calculation runs."
+                : "None — sunrise or sunset could not be resolved for this place and date."}
+            </p>
+          ) : null}
+        </article>
+        <article className="daily-card bless-card">
+          <h2>Auspicious daytime</h2>
+          <ul className="period-list">
+            {panchangDay.auspicious_periods.map((p) => (
+              <li key={p.code} className={`period-row ${p.category}`}>
+                <span className="period-name">{p.name}</span>
+                <span className="period-range">
+                  {timeOnly(p.start_local)} – {timeOnly(p.end_local)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {panchangDay.auspicious_periods.length === 0 ? (
+            <p className="muted">
+              {dayDetailDegraded ? "Included when the full local day calculation runs." : "None for this date."}
+            </p>
+          ) : null}
         </article>
       </div>
       <div className="hora-grid">

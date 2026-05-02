@@ -1,4 +1,7 @@
-use panchang_core::{civil_day, month, search_muhurta, snapshot, CivilDayRequest, MonthRequest, MuhurtaSearchRequest, SnapshotRequest};
+use panchang_core::{
+    civil_day, month, panchang_day, search_muhurta, snapshot, CivilDayRequest, MonthRequest,
+    MuhurtaSearchRequest, PanchangDayMode, PanchangDayRequest, SnapshotRequest,
+};
 
 #[test]
 fn snapshot_bangalore_smoke() {
@@ -29,6 +32,41 @@ fn civil_day_has_segments() {
     .expect("civil day");
     assert!(!out.tithi_intervals.is_empty());
     assert!(!out.nakshatra_intervals.is_empty());
+    assert!(!out.yoga_intervals.is_empty());
+    assert!(!out.karana_intervals.is_empty());
+    assert!(out
+        .tithi_intervals
+        .iter()
+        .all(|x| x.clipped_start_jd_ut >= x.start_jd_ut && x.clipped_end_jd_ut <= x.end_jd_ut));
+}
+
+#[test]
+fn panchang_day_has_hora_and_bad_periods() {
+    let out = panchang_day(PanchangDayRequest {
+        date: "2026-04-30".to_string(),
+        timezone: "Asia/Kolkata".to_string(),
+        latitude: 12.97,
+        longitude: 77.59,
+        day_mode: Some(PanchangDayMode::SunriseDay),
+        ayanamsha: None,
+        engine: None,
+    })
+    .expect("panchang day");
+    assert_eq!(out.day_mode, PanchangDayMode::SunriseDay);
+    assert!(out.day_start_jd_ut < out.day_end_jd_ut);
+    assert_eq!(out.hora.len(), 24);
+    assert!(!out.tithi_intervals.is_empty());
+    assert!(!out.nakshatra_intervals.is_empty());
+    assert!(!out.yoga_intervals.is_empty());
+    assert!(!out.karana_intervals.is_empty());
+    assert_eq!(out.inauspicious_periods.len(), 3);
+    assert_eq!(out.auspicious_periods.len(), 1);
+    assert_eq!(out.tamil_calendar.solar_month_name, "Chithirai");
+    assert_eq!(out.tamil_calendar.tamil_year_name, "Parabhava");
+    assert!(out
+        .inauspicious_periods
+        .iter()
+        .all(|p| p.jd_start < p.jd_end));
 }
 
 #[test]

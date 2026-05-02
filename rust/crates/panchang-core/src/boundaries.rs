@@ -6,7 +6,10 @@ use crate::types::{AyanamshaId, EngineId};
 fn sidereal(jd: f64, ay: AyanamshaId, engine: EngineId) -> (f64, f64) {
     let trop = ephemeris::apparent_tropical_longitudes(jd, engine);
     let d = ayanamsha::delta_deg(jd, ay);
-    (ephemeris::reduce_deg(trop.sun_deg - d), ephemeris::reduce_deg(trop.moon_lon_deg - d))
+    (
+        ephemeris::reduce_deg(trop.sun_deg - d),
+        ephemeris::reduce_deg(trop.moon_lon_deg - d),
+    )
 }
 
 fn elongation(jd: f64, ay: AyanamshaId, engine: EngineId) -> f64 {
@@ -81,7 +84,11 @@ where
 {
     for _ in 0..48 {
         let mid = 0.5 * (lo + hi);
-        if f(mid) < target { lo = mid; } else { hi = mid; }
+        if f(mid) < target {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
     }
     0.5 * (lo + hi)
 }
@@ -93,7 +100,11 @@ where
     for _ in 0..48 {
         let mid = 0.5 * (lo + hi);
         let v = f(mid);
-        if v < 3.0 || v > f(lo) { hi = mid; } else { lo = mid; }
+        if v < 3.0 || v > f(lo) {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
     }
     0.5 * (lo + hi)
 }
@@ -101,39 +112,51 @@ where
 pub fn next_tithi_end_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let e0 = elongation(jd0, ay, engine);
     let target = (((e0 / 12.0).floor() + 1.0) * 12.0) % 360.0;
-    scalar_forward(jd0, target, 2.0, 1.0 / 1440.0, |jd| elongation(jd, ay, engine))
+    scalar_forward(jd0, target, 2.0, 1.0 / 1440.0, |jd| {
+        elongation(jd, ay, engine)
+    })
 }
 
 pub fn prev_tithi_start_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let e0 = elongation(jd0, ay, engine);
     let target = ((e0 / 12.0).floor() * 12.0) % 360.0;
-    scalar_backward(jd0, target, 3.0, 1.0 / 1440.0, |jd| elongation(jd, ay, engine))
+    scalar_backward(jd0, target, 3.0, 1.0 / 1440.0, |jd| {
+        elongation(jd, ay, engine)
+    })
 }
 
 pub fn next_karana_end_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let e0 = elongation(jd0, ay, engine);
     let target = (((e0 / 6.0).floor() + 1.0) * 6.0) % 360.0;
-    scalar_forward(jd0, target, 1.2, 1.0 / 1440.0, |jd| elongation(jd, ay, engine))
+    scalar_forward(jd0, target, 1.2, 1.0 / 1440.0, |jd| {
+        elongation(jd, ay, engine)
+    })
 }
 
 pub fn prev_karana_start_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let e0 = elongation(jd0, ay, engine);
     let target = ((e0 / 6.0).floor() * 6.0) % 360.0;
-    scalar_backward(jd0, target, 2.0, 1.0 / 1440.0, |jd| elongation(jd, ay, engine))
+    scalar_backward(jd0, target, 2.0, 1.0 / 1440.0, |jd| {
+        elongation(jd, ay, engine)
+    })
 }
 
 pub fn next_nakshatra_end_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let span = 360.0 / 27.0;
     let m = moon_lon(jd0, ay, engine);
     let target = ((m / span).floor() + 1.0) * span;
-    scalar_forward(jd0, target, 2.0, 1.0 / 1440.0, |jd| moon_lon(jd, ay, engine))
+    scalar_forward(jd0, target, 2.0, 1.0 / 1440.0, |jd| {
+        moon_lon(jd, ay, engine)
+    })
 }
 
 pub fn prev_nakshatra_start_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
     let span = 360.0 / 27.0;
     let m = moon_lon(jd0, ay, engine);
     let target = ((m / span).floor() * span) % 360.0;
-    scalar_backward(jd0, target, 35.0, 1.0 / 1440.0, |jd| moon_lon(jd, ay, engine))
+    scalar_backward(jd0, target, 35.0, 1.0 / 1440.0, |jd| {
+        moon_lon(jd, ay, engine)
+    })
 }
 
 pub fn next_yoga_end_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
@@ -142,6 +165,17 @@ pub fn next_yoga_end_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f
     let y = (s + m) % 360.0;
     let target = ((y / span).floor() + 1.0) * span;
     scalar_forward(jd0, target, 2.0, 1.0 / 1440.0, |jd| {
+        let (ss, mm) = sidereal(jd, ay, engine);
+        (ss + mm) % 360.0
+    })
+}
+
+pub fn prev_yoga_start_jd(jd0: f64, ay: AyanamshaId, engine: EngineId) -> Option<f64> {
+    let span = 360.0 / 27.0;
+    let (s, m) = sidereal(jd0, ay, engine);
+    let y = (s + m) % 360.0;
+    let target = ((y / span).floor() * span) % 360.0;
+    scalar_backward(jd0, target, 3.0, 1.0 / 1440.0, |jd| {
         let (ss, mm) = sidereal(jd, ay, engine);
         (ss + mm) % 360.0
     })

@@ -1,10 +1,11 @@
 use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
 
-use crate::types::{iso_utc, PanchangError};
+use crate::types::PanchangError;
 
 pub fn parse_timezone(name: &str) -> Result<Tz, PanchangError> {
-    name.parse::<Tz>().map_err(|_| PanchangError::InvalidTimezone(name.to_string()))
+    name.parse::<Tz>()
+        .map_err(|_| PanchangError::InvalidTimezone(name.to_string()))
 }
 
 pub fn parse_local_datetime(value: &str) -> Result<NaiveDateTime, PanchangError> {
@@ -17,7 +18,8 @@ pub fn parse_local_datetime(value: &str) -> Result<NaiveDateTime, PanchangError>
 }
 
 pub fn parse_date(value: &str) -> Result<NaiveDate, PanchangError> {
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| PanchangError::InvalidDate(value.to_string()))
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .map_err(|_| PanchangError::InvalidDate(value.to_string()))
 }
 
 pub fn local_to_utc(local: NaiveDateTime, zone: Tz) -> DateTime<Utc> {
@@ -54,19 +56,22 @@ pub fn julian_day_ut(utc: DateTime<Utc>) -> f64 {
 
 pub fn datetime_utc_from_jd(jd: f64) -> DateTime<Utc> {
     let unix = ((jd - 2440587.5) * 86400.0).round() as i64;
-    Utc.timestamp_opt(unix, 0).single().expect("Julian day converted outside chrono timestamp range")
+    Utc.timestamp_opt(unix, 0)
+        .single()
+        .expect("Julian day converted outside chrono timestamp range")
 }
 
 pub fn local_iso_from_jd(jd: f64, zone: Tz) -> String {
-    datetime_utc_from_jd(jd).with_timezone(&zone).format("%Y-%m-%dT%H:%M:%S%:z").to_string()
-}
-
-pub fn utc_iso_from_jd(jd: f64) -> String {
-    iso_utc(datetime_utc_from_jd(jd))
+    datetime_utc_from_jd(jd)
+        .with_timezone(&zone)
+        .format("%Y-%m-%dT%H:%M:%S%:z")
+        .to_string()
 }
 
 pub fn jd_from_local_midnight(date: NaiveDate, zone: Tz) -> f64 {
-    let midnight = date.and_hms_opt(0, 0, 0).expect("valid midnight for NaiveDate");
+    let midnight = date
+        .and_hms_opt(0, 0, 0)
+        .expect("valid midnight for NaiveDate");
     julian_day_ut(local_to_utc(midnight, zone))
 }
 

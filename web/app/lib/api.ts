@@ -15,6 +15,12 @@ export type Segment = {
   end_jd_ut: number;
   start_local: string;
   end_local: string;
+  clipped_start_jd_ut?: number;
+  clipped_end_jd_ut?: number;
+  clipped_start_local?: string;
+  clipped_end_local?: string;
+  starts_before_window?: boolean;
+  ends_after_window?: boolean;
   pada?: number | null;
 };
 
@@ -50,6 +56,52 @@ export type CivilDayResponse = {
   timezone: string;
   tithi_intervals: Segment[];
   nakshatra_intervals: Segment[];
+  yoga_intervals?: Segment[];
+  karana_intervals?: Segment[];
+};
+
+export type DayPeriod = {
+  code: string;
+  name: string;
+  category: string;
+  jd_start: number;
+  jd_end: number;
+  start_local: string;
+  end_local: string;
+  source: string;
+};
+
+export type PanchangDayResponse = {
+  date: string;
+  timezone: string;
+  day_mode: "civil_midnight" | "sunrise_day";
+  day_start_jd_ut: number;
+  day_end_jd_ut: number;
+  day_start_local: string;
+  day_end_local: string;
+  sunrise_local?: string | null;
+  sunset_local?: string | null;
+  next_sunrise_local?: string | null;
+  vaara_civil_local: string;
+  vaara_at_sunrise?: string | null;
+  angas_at_sunrise?: SnapshotResponse["angas"] | null;
+  tamil_calendar: {
+    solar_month_index: number;
+    solar_month_name: string;
+    solar_month_name_tamil: string;
+    tamil_year_index: number;
+    tamil_year_name: string;
+    ayana: string;
+    ritu: string;
+    weekday_name_tamil: string;
+  };
+  tithi_intervals: Segment[];
+  nakshatra_intervals: Segment[];
+  yoga_intervals: Segment[];
+  karana_intervals: Segment[];
+  hora: SnapshotResponse["hora"];
+  inauspicious_periods: DayPeriod[];
+  auspicious_periods: DayPeriod[];
 };
 
 export type MonthResponse = {
@@ -60,8 +112,12 @@ export type MonthResponse = {
     date: string;
     tithi_leader?: string | null;
     nakshatra_leader?: string | null;
+    yoga_leader?: string | null;
+    karana_leader?: string | null;
     tithi_intervals: Segment[];
     nakshatra_intervals: Segment[];
+    yoga_intervals?: Segment[];
+    karana_intervals?: Segment[];
   }>;
 };
 
@@ -83,4 +139,23 @@ export type MuhurtaResponse = {
 export function timeOnly(value: string): string {
   const match = value.match(/T(\d\d:\d\d:\d\d)/);
   return match?.[1] ?? value;
+}
+
+/** Date portion (YYYY-MM-DD) extracted from an ISO local-datetime string. */
+export function dateOnly(value: string): string {
+  return value.slice(0, 10);
+}
+
+/** Format a YYYY-MM-DD as a long, locale-friendly label like "Sat, May 2 2026". */
+export function formatDateLong(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0));
+  return dt.toLocaleDateString(undefined, {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
 }

@@ -15,7 +15,11 @@ pub fn paksha_and_day(elong: f64) -> (&'static str, u8) {
 
 fn describe_tithi_name(paksha: &str, day: u8) -> String {
     if day == 15 {
-        if paksha == "shukla" { "Purnima".to_string() } else { "Amavasya".to_string() }
+        if paksha == "shukla" {
+            "Purnima".to_string()
+        } else {
+            "Amavasya".to_string()
+        }
     } else {
         names::TITHI_NAMES[(day - 1) as usize].to_string()
     }
@@ -27,7 +31,9 @@ fn karana_name_from_half_index(half: u8) -> &'static str {
         57 => "Shakuni",
         58 => "Chatushpada",
         59 => "Naga",
-        h => ["Bava", "Balava", "Kaulava", "Taitila", "Gara", "Vanija", "Vishti"][((h - 1) % 7) as usize],
+        h => [
+            "Bava", "Balava", "Kaulava", "Taitila", "Gara", "Vanija", "Vishti",
+        ][((h - 1) % 7) as usize],
     }
 }
 
@@ -49,7 +55,8 @@ pub fn compute_angas(sun_sidereal: f64, moon_sidereal: f64) -> PanchangAngas {
         paksha_day,
         nakshatra_index,
         nakshatra_name: names::NAKSHATRA_NAMES[(nakshatra_index - 1) as usize].to_string(),
-        nakshatra_name_tamil: names::NAKSHATRA_NAMES_TAMIL[(nakshatra_index - 1) as usize].to_string(),
+        nakshatra_name_tamil: names::NAKSHATRA_NAMES_TAMIL[(nakshatra_index - 1) as usize]
+            .to_string(),
         nakshatra_pada,
         yoga_index,
         yoga_name: names::YOGA_NAMES[(yoga_index - 1) as usize].to_string(),

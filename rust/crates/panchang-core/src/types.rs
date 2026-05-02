@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -61,6 +60,30 @@ pub struct CivilDayRequest {
     pub timezone: String,
     pub latitude: f64,
     pub longitude: f64,
+    pub ayanamsha: Option<AyanamshaId>,
+    pub engine: Option<EngineId>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PanchangDayMode {
+    CivilMidnight,
+    SunriseDay,
+}
+
+impl Default for PanchangDayMode {
+    fn default() -> Self {
+        Self::CivilMidnight
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
+pub struct PanchangDayRequest {
+    pub date: String,
+    pub timezone: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub day_mode: Option<PanchangDayMode>,
     pub ayanamsha: Option<AyanamshaId>,
     pub engine: Option<EngineId>,
 }
@@ -155,6 +178,12 @@ pub struct Segment {
     pub end_jd_ut: f64,
     pub start_local: String,
     pub end_local: String,
+    pub clipped_start_jd_ut: f64,
+    pub clipped_end_jd_ut: f64,
+    pub clipped_start_local: String,
+    pub clipped_end_local: String,
+    pub starts_before_window: bool,
+    pub ends_after_window: bool,
     pub pada: Option<u8>,
 }
 
@@ -164,6 +193,60 @@ pub struct CivilDayResponse {
     pub timezone: String,
     pub tithi_intervals: Vec<Segment>,
     pub nakshatra_intervals: Vec<Segment>,
+    pub yoga_intervals: Vec<Segment>,
+    pub karana_intervals: Vec<Segment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
+pub struct DayPeriod {
+    pub code: String,
+    pub name: String,
+    pub category: String,
+    pub jd_start: f64,
+    pub jd_end: f64,
+    pub start_local: String,
+    pub end_local: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
+pub struct TamilCalendarDay {
+    pub solar_month_index: u8,
+    pub solar_month_name: String,
+    pub solar_month_name_tamil: String,
+    pub tamil_year_index: u8,
+    pub tamil_year_name: String,
+    pub ayana: String,
+    pub ritu: String,
+    pub weekday_name_tamil: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
+pub struct PanchangDayResponse {
+    pub date: String,
+    pub timezone: String,
+    pub day_mode: PanchangDayMode,
+    pub day_start_jd_ut: f64,
+    pub day_end_jd_ut: f64,
+    pub day_start_local: String,
+    pub day_end_local: String,
+    pub sunrise_jd_ut: Option<f64>,
+    pub sunrise_local: Option<String>,
+    pub sunset_jd_ut: Option<f64>,
+    pub sunset_local: Option<String>,
+    pub next_sunrise_jd_ut: Option<f64>,
+    pub next_sunrise_local: Option<String>,
+    pub vaara_civil_local: String,
+    pub vaara_at_sunrise: Option<String>,
+    pub angas_at_sunrise: Option<PanchangAngas>,
+    pub tamil_calendar: TamilCalendarDay,
+    pub tithi_intervals: Vec<Segment>,
+    pub nakshatra_intervals: Vec<Segment>,
+    pub yoga_intervals: Vec<Segment>,
+    pub karana_intervals: Vec<Segment>,
+    pub hora: Vec<HoraInterval>,
+    pub inauspicious_periods: Vec<DayPeriod>,
+    pub auspicious_periods: Vec<DayPeriod>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
@@ -171,8 +254,12 @@ pub struct MonthDay {
     pub date: String,
     pub tithi_leader: Option<String>,
     pub nakshatra_leader: Option<String>,
+    pub yoga_leader: Option<String>,
+    pub karana_leader: Option<String>,
     pub tithi_intervals: Vec<Segment>,
     pub nakshatra_intervals: Vec<Segment>,
+    pub yoga_intervals: Vec<Segment>,
+    pub karana_intervals: Vec<Segment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
@@ -215,6 +302,3 @@ pub(crate) fn validate_observer(latitude: f64, longitude: f64) -> Result<(), Pan
     }
 }
 
-pub(crate) fn iso_utc(dt: DateTime<Utc>) -> String {
-    dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
-}
