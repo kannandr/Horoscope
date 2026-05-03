@@ -1,9 +1,12 @@
 use chrono::{Duration, NaiveDate};
+use panchang_core::{
+    julian_day_ut, local_iso_from_jd, local_to_utc, parse_date, parse_timezone, validate_observer,
+    DayPeriod, PanchangDayMode, PanchangDayRequest, SnapshotRequest,
+};
 
-use crate::time;
+use crate::client::PanchangClient;
 use crate::types::{
-    validate_observer, DayPeriod, MuhurtaSearchRequest, MuhurtaSearchResponse, MuhurtaWindow,
-    PanchangDayMode, PanchangDayRequest, PanchangError, SnapshotRequest,
+    EngineError, MuhurtaSearchRequest, MuhurtaSearchResponse, MuhurtaWindow,
 };
 
 const FAVORABLE_NAKSHATRAS: &[&str] = &[
@@ -33,11 +36,20 @@ fn overlaps(start_jd: f64, end_jd: f64, period: &DayPeriod) -> bool {
     start_jd < period.jd_end && end_jd > period.jd_start
 }
 
-pub fn search_muhurta(req: MuhurtaSearchRequest) -> Result<MuhurtaSearchResponse, PanchangError> {
+/// Search auspicious time windows by asking a [`PanchangClient`] for the
+/// underlying Panchang data and applying the rule set.
+///
+/// In production `client` is an `McpPanchangClient`, which means every
+/// scoring iteration round-trips the network. That is intentional: it is
+/// the same surface a learned model would consume.
+pub async fn search_muhurta<C: PanchangClient + ?Sized>(
+    client: &C,
+    req: MuhurtaSearchRequest,
+) -> Result<MuhurtaSearchResponse, EngineError> {
     validate_observer(req.latitude, req.longitude)?;
-    let tz = time::parse_timezone(&req.timezone)?;
-    let start = time::parse_date(&req.date_start)?;
-    let end = time::parse_date(&req.date_end)?;
+    let tz = parse_timezone(&req.timezone)?;
+    let start = parse_date(&req.date_start)?;
+    let end = parse_date(&req.date_end)?;
     let min_minutes = req.min_duration_minutes.unwrap_or(45).max(15);
     let preset = req
         .purpose_preset
@@ -46,28 +58,32 @@ pub fn search_muhurta(req: MuhurtaSearchRequest) -> Result<MuhurtaSearchResponse
     let mut windows = Vec::new();
 
     for date in date_range(start, end) {
-        let day = crate::panchang_day(PanchangDayRequest {
-            date: date.to_string(),
-            timezone: req.timezone.clone(),
-            latitude: req.latitude,
-            longitude: req.longitude,
-            day_mode: Some(PanchangDayMode::CivilMidnight),
-            ayanamsha: req.ayanamsha,
-            engine: req.engine,
-        })?;
+        let day = client
+            .panchang_day(PanchangDayRequest {
+                date: date.to_string(),
+                timezone: req.timezone.clone(),
+                latitude: req.latitude,
+                longitude: req.longitude,
+                day_mode: Some(PanchangDayMode::CivilMidnight),
+                ayanamsha: req.ayanamsha,
+                engine: req.engine,
+            })
+            .await?;
 
         for hour in 6..19 {
             let local = date
                 .and_hms_opt(hour, 0, 0)
                 .expect("valid whole-hour local time");
-            let snap = crate::snapshot(SnapshotRequest {
-                when_local: local.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                timezone: req.timezone.clone(),
-                latitude: req.latitude,
-                longitude: req.longitude,
-                ayanamsha: req.ayanamsha,
-                engine: req.engine,
-            })?;
+            let snap = client
+                .snapshot(SnapshotRequest {
+                    when_local: local.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                    timezone: req.timezone.clone(),
+                    latitude: req.latitude,
+                    longitude: req.longitude,
+                    ayanamsha: req.ayanamsha,
+                    engine: req.engine,
+                })
+                .await?;
             let mut score = 50;
             let mut reasons = Vec::new();
             let mut exclusions = Vec::new();
@@ -97,7 +113,7 @@ pub fn search_muhurta(req: MuhurtaSearchRequest) -> Result<MuhurtaSearchResponse
                     snap.angas.tithi_name
                 ));
             }
-            let start_jd = time::julian_day_ut(time::local_to_utc(local, tz));
+            let start_jd = julian_day_ut(local_to_utc(local, tz));
             let end_jd = start_jd + min_minutes as f64 / 1440.0;
             let bad_periods = day
                 .inauspicious_periods
@@ -125,8 +141,8 @@ pub fn search_muhurta(req: MuhurtaSearchRequest) -> Result<MuhurtaSearchResponse
             }
             if score >= 55 {
                 windows.push(MuhurtaWindow {
-                    start_local: time::local_iso_from_jd(start_jd, tz),
-                    end_local: time::local_iso_from_jd(end_jd, tz),
+                    start_local: local_iso_from_jd(start_jd, tz),
+                    end_local: local_iso_from_jd(end_jd, tz),
                     duration_minutes: min_minutes,
                     score,
                     label: if score >= 80 {

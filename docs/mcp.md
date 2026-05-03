@@ -1,7 +1,8 @@
 # Panchang MCP Server
 
-This document describes the hosted Panchang Model Context Protocol (MCP) server
-for model/tool callers.
+This document describes the hosted Panchang Model Context Protocol (MCP)
+server for model/tool callers. The MCP server is the calculation boundary. It
+does not score auspicious times directly.
 
 ## Overview
 
@@ -9,6 +10,21 @@ The MCP server exposes deterministic Panchang calculations from the Rust
 `panchang-core` engine. It does not contain a separate calculation
 implementation. All tool calls go through the same Rust service functions used
 by the HTTP API.
+
+Current tools:
+
+- `calculate_panchang_snapshot`
+- `list_civil_day_segments`
+- `calculate_panchang_day`
+- `list_inauspicious_periods`
+
+**South Indian natal charts** are served by a sibling binary, **`horoscope-mcp`**
+(same JSON-RPC envelope and auth). Its tool is `calculate_south_indian_natal_chart`.
+See [`docs/horoscope-mcp.md`](horoscope-mcp.md).
+
+Auspicious-time scoring lives in `muhurta-engine` / `muhurta-api`.
+`PANCHANG_MCP_BASE_URL` is set, `muhurta-api` becomes an MCP client of this
+server and uses these same calculation tools.
 
 Current staging endpoint:
 
@@ -68,6 +84,54 @@ Required headers:
 content-type: application/json
 Authorization: Bearer <MCP_SHARED_SECRET>
 ```
+
+## MCP spec alignment (what matches / what differs)
+
+This server follows **JSON-RPC 2.0** and exposes an **`initialize`** handshake,
+**`tools/list`**, and **`tools/call`** pattern consistent with tool-based MCP
+servers. Tool metadata uses JSON Schema-style **`inputSchema`** objects.
+
+**Not** a full generic MCP host stack today:
+
+- Transport is **HTTP `POST /mcp`** only (no **stdio** MCP transport in this
+  binary; no SSE stream).
+- Only the methods above are implemented (no `resources/*`, `prompts/*`, or
+  open-ended `notifications/*`).
+- Successful **`tools/call`** responses wrap the engine payload as:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "{...stringified JSON...}" }],
+    "structuredContent": { }
+  }
+}
+```
+
+Clients that consume **`structuredContent`** (e.g. `muhurta-engine`'s
+`McpPanchangClient`) see the same shapes as **`panchang-api`** POST bodies.
+
+## Date and time inputs (past / future / range)
+
+There is **no** application rule limiting requests to “the last 100 years”.
+Customers may send **past or future** civil dates as long as they parse:
+
+| Field | Format | Notes |
+|-------|--------|--------|
+| `when_local` | `YYYY-MM-DDTHH:MM:SS` or RFC3339 | Interpreted with `timezone` (IANA). |
+| `date` | `YYYY-MM-DD` | Civil day for day/month-style tools. |
+| `year`, `month` | calendar month grid | `year` is `i32` (HTTP `/v1/panchang/month`); not exposed as an MCP tool here but same core. |
+
+**Accuracy:** The built-in ephemeris is intended for modern-era use (Meeus-style
+polynomials). Dates far from the present century may still **parse and return**
+angles, but astronomical precision is not guaranteed for extreme historical or
+far-future epochs. For **±100 years or more** around today, the stack is
+designed to accept them; CI includes a smoke test at roughly **±100 years**.
+
+The web app uses a plain `<input type="date">` **without** `min`/`max`, so the
+browser’s native picker range applies (typically very wide).
 
 ## Tools
 
@@ -186,48 +250,17 @@ gulika_kalam
 
 Input is the same as `calculate_panchang_day`.
 
-### `search_auspicious_windows`
+### Auspicious-window search has moved out of MCP
 
-Searches South Indian/Tamil-focused auspicious time windows with transparent
-scoring reasons and exclusions.
-
-Input:
-
-```json
-{
-  "date_start": "2026-05-02",
-  "date_end": "2026-05-04",
-  "timezone": "America/Los_Angeles",
-  "latitude": 37.6821,
-  "longitude": -121.768,
-  "purpose_preset": "general",
-  "min_duration_minutes": 30,
-  "ayanamsha": "lahiri",
-  "engine": "meeus"
-}
-```
-
-Required fields:
-
-```text
-date_start, date_end, timezone, latitude, longitude
-```
-
-### `explain_auspicious_window`
-
-Explains the scoring fields returned by `search_auspicious_windows`.
-
-Input:
-
-```json
-{
-  "window": {
-    "score": 12,
-    "reasons": ["example positive rule"],
-    "exclusions": ["example caution"]
-  }
-}
-```
+The Panchang MCP server intentionally exposes **only calculation primitives**.
+Auspicious-time scoring (formerly `search_auspicious_windows` /
+`explain_auspicious_window`) is now its own usage app
+(`muhurta-engine` + `muhurta-api`) and lives at `POST /v1/muhurta/search` on
+that service. With `PANCHANG_MCP_BASE_URL` set, that service calls this MCP
+server over JSON-RPC and reads `result.structuredContent`. Without that
+environment variable, it falls back to in-process `panchang-core` for local
+developer convenience. See [`docs/rust-engine.md`](rust-engine.md) for the
+boundary.
 
 ## JSON-RPC Examples
 
@@ -351,7 +384,10 @@ Container Apps:
 - Secret: `MCP_SHARED_SECRET`
 - Health checks: `/healthz`, `/readyz`
 
-The MCP URL is emitted by Bicep as `mcpUrl`.
+The MCP URL is emitted by Bicep as `mcpUrl`. The `muhurta-api` container should
+receive that root URL as `PANCHANG_MCP_BASE_URL` and the same
+`MCP_SHARED_SECRET` so auspicious-time scoring exercises the hosted MCP
+boundary.
 
 ## Client Notes
 
@@ -362,6 +398,9 @@ The MCP URL is emitted by Bicep as `mcpUrl`.
   a browser application boundary.
 - This shared-secret setup is simple abuse resistance for private beta. It is
   not per-user identity, rate limiting, or tenant isolation.
+- Do not ask this MCP server for final muhurta advice. Ask it for Panchang
+  facts, then send those facts through `muhurta-api` or a future local
+  natural-language agent that calls `muhurta-api`.
 
 ## Open Source Boundary
 

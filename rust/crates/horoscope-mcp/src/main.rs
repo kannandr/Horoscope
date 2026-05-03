@@ -5,9 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use panchang_core::{
-    civil_day, panchang_day, snapshot, CivilDayRequest, PanchangDayRequest, SnapshotRequest,
-};
+use horoscope_core::{calculate_south_indian_natal_chart, NatalChartRequest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -15,8 +13,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
-    /// Protocol version field; deserialized to accept the JSON-RPC envelope
-    /// faithfully but not used at runtime (we always reply with "2.0").
     #[allow(dead_code)]
     jsonrpc: Option<String>,
     id: Option<Value>,
@@ -63,7 +59,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&bind)
         .await
         .expect("bind MCP listener");
-    tracing::info!(%bind, "panchang-mcp listening");
+    tracing::info!(%bind, "horoscope-mcp listening");
     axum::serve(listener, app).await.expect("serve MCP");
 }
 
@@ -90,7 +86,7 @@ async fn mcp(headers: HeaderMap, Json(req): Json<JsonRpcRequest>) -> Response {
             id,
             json!({
                 "protocolVersion": "2025-06-18",
-                "serverInfo": { "name": "panchang-mcp", "version": env!("CARGO_PKG_VERSION") },
+                "serverInfo": { "name": "horoscope-mcp", "version": env!("CARGO_PKG_VERSION") },
                 "capabilities": { "tools": {} }
             }),
         ),
@@ -99,24 +95,9 @@ async fn mcp(headers: HeaderMap, Json(req): Json<JsonRpcRequest>) -> Response {
             json!({
                 "tools": [
                     {
-                        "name": "calculate_panchang_snapshot",
-                        "description": "Calculate Panchang angas and local transition times for an observer and local datetime.",
-                        "inputSchema": snapshot_schema()
-                    },
-                    {
-                        "name": "list_civil_day_segments",
-                        "description": "List tithi, nakshatra, yoga, and karana intervals intersecting one local civil day.",
-                        "inputSchema": civil_day_schema()
-                    },
-                    {
-                        "name": "calculate_panchang_day",
-                        "description": "Calculate a rich Panchang day object with sunrise, vaara, angas, intervals, hora, rahu kalam, yama gandam, gulika, and abhijit muhurta.",
-                        "inputSchema": panchang_day_schema()
-                    },
-                    {
-                        "name": "list_inauspicious_periods",
-                        "description": "List South Indian/Tamil daytime caution periods for a date/location: rahu kalam, yama gandam, and gulika kalam.",
-                        "inputSchema": panchang_day_schema()
+                        "name": "calculate_south_indian_natal_chart",
+                        "description": "South Indian sidereal natal chart: lagna, Sun/Moon, Panchang at birth, Tamil hints, Vimshottari dasha–bhukti from birth through as-of + horizon years.",
+                        "inputSchema": natal_chart_schema()
                     }
                 ]
             }),
@@ -171,32 +152,10 @@ fn call_tool(id: Option<Value>, params: Option<Value>) -> JsonRpcResponse {
         .cloned()
         .unwrap_or_else(|| json!({}));
     let result = match name {
-        "calculate_panchang_snapshot" => serde_json::from_value::<SnapshotRequest>(args)
+        "calculate_south_indian_natal_chart" => serde_json::from_value::<NatalChartRequest>(args)
             .map_err(|e| e.to_string())
-            .and_then(|r| snapshot(r).map_err(|e| e.to_string()))
+            .and_then(|r| calculate_south_indian_natal_chart(r).map_err(|e| e.to_string()))
             .and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())),
-        "list_civil_day_segments" => serde_json::from_value::<CivilDayRequest>(args)
-            .map_err(|e| e.to_string())
-            .and_then(|r| civil_day(r).map_err(|e| e.to_string()))
-            .and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())),
-        "calculate_panchang_day" => serde_json::from_value::<PanchangDayRequest>(args)
-            .map_err(|e| e.to_string())
-            .and_then(|r| panchang_day(r).map_err(|e| e.to_string()))
-            .and_then(|r| serde_json::to_value(r).map_err(|e| e.to_string())),
-        "list_inauspicious_periods" => serde_json::from_value::<PanchangDayRequest>(args)
-            .map_err(|e| e.to_string())
-            .and_then(|r| panchang_day(r).map_err(|e| e.to_string()))
-            .and_then(|r| {
-                serde_json::to_value(json!({
-                    "date": r.date,
-                    "timezone": r.timezone,
-                    "day_mode": r.day_mode,
-                    "sunrise_local": r.sunrise_local,
-                    "sunset_local": r.sunset_local,
-                    "periods": r.inauspicious_periods
-                }))
-                .map_err(|e| e.to_string())
-            }),
         _ => return err(id, -32602, format!("unknown tool: {name}"), None),
     };
     match result {
@@ -235,59 +194,28 @@ fn err(id: Option<Value>, code: i32, message: String, data: Option<Value>) -> Js
     }
 }
 
-fn snapshot_schema() -> Value {
+fn natal_chart_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "when_local": {
+            "birth_local": {
                 "type": "string",
-                "description": "Local datetime: RFC3339 with offset, or YYYY-MM-DDTHH:MM:SS (wall time in the given timezone). Any civil date the parser accepts; no artificial ±100-year window."
+                "description": "Birth datetime: RFC3339 with offset, or YYYY-MM-DDTHH:MM:SS (wall time in `timezone`)."
             },
             "timezone": { "type": "string", "description": "IANA timezone, e.g. Asia/Kolkata" },
             "latitude": { "type": "number" },
             "longitude": { "type": "number" },
             "ayanamsha": { "type": "string", "enum": ["lahiri", "lahiri_alt_stub", "raman"] },
-            "engine": { "type": "string", "enum": ["meeus", "surya_mean"] }
-        },
-        "required": ["when_local", "timezone", "latitude", "longitude"]
-    })
-}
-
-fn civil_day_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "date": {
-                "type": "string",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                "description": "ISO civil date YYYY-MM-DD. Past and future dates are allowed (no fixed ±100y cap)."
+            "engine": { "type": "string", "enum": ["meeus", "surya_mean"] },
+            "dasha_horizon_years": {
+                "type": "integer",
+                "description": "Emit dasha–bhukti intersecting birth through as-of plus this many calendar years (default 20)."
             },
-            "timezone": { "type": "string" },
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" },
-            "ayanamsha": { "type": "string", "enum": ["lahiri", "lahiri_alt_stub", "raman"] },
-            "engine": { "type": "string", "enum": ["meeus", "surya_mean"] }
-        },
-        "required": ["date", "timezone", "latitude", "longitude"]
-    })
-}
-
-fn panchang_day_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "date": {
+            "as_of_local": {
                 "type": "string",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                "description": "ISO civil date YYYY-MM-DD. Past and future dates are allowed (no fixed ±100y cap)."
-            },
-            "timezone": { "type": "string", "description": "IANA timezone" },
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" },
-            "day_mode": { "type": "string", "enum": ["civil_midnight", "sunrise_day"], "description": "civil_midnight preserves UI day semantics; sunrise_day anchors the Panchang day from sunrise to next sunrise." },
-            "ayanamsha": { "type": "string", "enum": ["lahiri", "lahiri_alt_stub", "raman"] },
-            "engine": { "type": "string", "enum": ["meeus", "surya_mean"] }
+                "description": "Optional anchor for dasha window end (same formats as birth_local). Defaults to now in `timezone`."
+            }
         },
-        "required": ["date", "timezone", "latitude", "longitude"]
+        "required": ["birth_local", "timezone", "latitude", "longitude"]
     })
 }

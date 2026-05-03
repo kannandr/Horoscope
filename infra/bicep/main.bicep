@@ -12,11 +12,17 @@ param acrName string
 @description('Container image for the Next.js web app.')
 param webImage string
 
-@description('Container image for the Rust API.')
+@description('Container image for the Panchang calculation HTTP API.')
 param apiImage string
 
-@description('Container image for the MCP server.')
+@description('Container image for the Panchang calculation MCP endpoint.')
 param mcpImage string
+
+@description('Container image for the Muhurta (auspicious-time) usage app.')
+param muhurtaImage string
+
+@description('Container image for the Horoscope MCP endpoint (South Indian natal chart).')
+param horoscopeImage string
 
 @secure()
 @minLength(16)
@@ -27,6 +33,8 @@ var prefix = 'panchang-${environmentName}'
 var apiName = '${prefix}-api'
 var webName = '${prefix}-web'
 var mcpName = '${prefix}-mcp'
+var muhurtaName = '${prefix}-muhurta'
+var horoscopeMcpName = '${prefix}-horoscope-mcp'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: '${prefix}-logs'
@@ -142,6 +150,81 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+resource muhurtaApi 'Microsoft.App/containerApps@2024-03-01' = {
+  name: muhurtaName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: acaEnv.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: false
+        targetPort: 8090
+        transport: 'http'
+      }
+      secrets: [
+        {
+          name: 'mcp-shared-secret'
+          value: mcpSharedSecret
+        }
+      ]
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: identity.id
+        }
+      ]
+    }
+    template: {
+      scale: {
+        minReplicas: 1
+        maxReplicas: 5
+        rules: [
+          {
+            name: 'http'
+            http: {
+              metadata: {
+                concurrentRequests: '50'
+              }
+            }
+          }
+        ]
+      }
+      containers: [
+        {
+          name: 'muhurta'
+          image: muhurtaImage
+          env: [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
+            // Phase-2 wire boundary: muhurta-api calls panchang-mcp over JSON-RPC.
+            {
+              name: 'PANCHANG_MCP_BASE_URL'
+              value: 'https://${mcp.properties.configuration.ingress.fqdn}'
+            }
+            {
+              name: 'MCP_SHARED_SECRET'
+              secretRef: 'mcp-shared-secret'
+            }
+          ]
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+        }
+      ]
+    }
+  }
+}
+
 resource web 'Microsoft.App/containerApps@2024-03-01' = {
   name: webName
   location: location
@@ -191,6 +274,10 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'PANCHANG_API_BASE_URL'
               value: 'https://${api.properties.configuration.ingress.fqdn}'
+            }
+            {
+              name: 'MUHURTA_API_BASE_URL'
+              value: 'https://${muhurtaApi.properties.configuration.ingress.fqdn}'
             }
             {
               name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -278,6 +365,77 @@ resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+resource horoscopeMcp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: horoscopeMcpName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: acaEnv.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        targetPort: 8080
+        transport: 'http'
+        allowInsecure: false
+      }
+      secrets: [
+        {
+          name: 'mcp-shared-secret'
+          value: mcpSharedSecret
+        }
+      ]
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: identity.id
+        }
+      ]
+    }
+    template: {
+      scale: {
+        minReplicas: 1
+        maxReplicas: 5
+        rules: [
+          {
+            name: 'http'
+            http: {
+              metadata: {
+                concurrentRequests: '40'
+              }
+            }
+          }
+        ]
+      }
+      containers: [
+        {
+          name: 'horoscope-mcp'
+          image: horoscopeImage
+          env: [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
+            {
+              name: 'MCP_SHARED_SECRET'
+              secretRef: 'mcp-shared-secret'
+            }
+          ]
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+        }
+      ]
+    }
+  }
+}
+
 /* Explicitly disable Container Apps easy auth. MCP remains protected by its
    app-level shared password; removing auth entirely would leave prior
    revisions' auth settings on upgrade. */
@@ -301,6 +459,17 @@ resource mcpAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
   }
 }
 
+resource horoscopeMcpAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: horoscopeMcp
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: false
+    }
+  }
+}
+
 output registryLoginServer string = acr.properties.loginServer
 output webUrl string = 'https://${web.properties.configuration.ingress.fqdn}'
 output mcpUrl string = 'https://${mcp.properties.configuration.ingress.fqdn}/mcp'
+output horoscopeMcpUrl string = 'https://${horoscopeMcp.properties.configuration.ingress.fqdn}/mcp'

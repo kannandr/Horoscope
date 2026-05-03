@@ -5,11 +5,17 @@ import type { MuhurtaResponse, Observer } from "@/app/lib/api";
 import { dateOnly, formatDateLong, timeOnly } from "@/app/lib/api";
 import { parseMuhurtaQuery } from "@/app/lib/muhurtaParse";
 
+export type AuspiciousNotice = {
+  title: string;
+  body: string;
+};
+
 export function AuspiciousView({
   anchorDate,
   observer,
   result,
   busy,
+  notice,
   onSearch,
   onAnchorDateChange
 }: {
@@ -17,6 +23,7 @@ export function AuspiciousView({
   observer: Observer;
   result: MuhurtaResponse | null;
   busy: boolean;
+  notice: AuspiciousNotice | null;
   onSearch: (query: string) => void;
   onAnchorDateChange: (iso: string) => void;
 }) {
@@ -38,7 +45,8 @@ export function AuspiciousView({
         <h2 className="auspicious-title">Auspicious times</h2>
         <p className="auspicious-lede muted">
           Describe your event in plain English (nakshatra names, wedding, travel, how many days to search).
-          The calculator uses the Tamil / South Indian general rules from the Rust engine.
+          Scoring runs in the Muhurta service; each candidate asks the Panchang calculation core for times and
+          angas — in production that core is reached via the same MCP server agents use, not a third-party API.
         </p>
       </header>
 
@@ -76,13 +84,20 @@ export function AuspiciousView({
         </aside>
       ) : null}
 
+      {notice ? (
+        <aside className="day-detail-notice" role="alert" aria-live="polite">
+          <span className="day-detail-notice-title">{notice.title}</span>
+          <span className="day-detail-notice-body">{notice.body}</span>
+        </aside>
+      ) : null}
+
       <div className="auspicious-meta muted">
         <span>
           Location: {observer.latitude.toFixed(4)}°, {observer.longitude.toFixed(4)}° · {observer.timezone}
         </span>
       </div>
 
-      {result && result.windows.length === 0 ? (
+      {result && result.windows.length === 0 && !notice ? (
         <p className="auspicious-empty muted">No scored windows in this range — try widening dates or lowering the minimum duration.</p>
       ) : null}
 

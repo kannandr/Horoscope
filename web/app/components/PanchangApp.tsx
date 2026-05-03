@@ -22,6 +22,42 @@ type View = "month" | "week" | "day" | "auspicious";
 /** Short banner when full-day API is unavailable (still all-local Rust). */
 type DayDetailNotice = { title: string; body: string };
 
+/** Short banner shown in the Auspicious tab when muhurta-api or its
+    upstream panchang-mcp degrades. */
+type AuspiciousNotice = { title: string; body: string };
+
+/** Translate a thrown error from /api/muhurta/search into a user-friendly
+    notice. `postJson` prefixes messages with `${status}:` so we can tell
+    apart wire failures (502/503), MCP auth (401), and bad input (400). */
+function muhurtaNoticeFromError(e: unknown): AuspiciousNotice {
+  const raw = e instanceof Error ? e.message : "Auspicious search failed";
+  const m = raw.match(/^(\d{3}):/);
+  const status = m ? Number(m[1]) : null;
+  if (status === 503) {
+    return {
+      title: "Auspicious search service is unreachable",
+      body: "muhurta-api did not respond. Start it locally with: scripts/restart-api.sh muhurta-api"
+    };
+  }
+  if (status === 502) {
+    return {
+      title: "Panchang core (MCP) is degraded",
+      body:
+        "muhurta-api could not get Panchang data from panchang-mcp (JSON-RPC). Locally: run panchang-mcp on another port (see README), set PANCHANG_MCP_BASE_URL and MCP_SHARED_SECRET on muhurta-api, then restart muhurta-api."
+    };
+  }
+  if (status === 401 || /MCP shared password/.test(raw)) {
+    return {
+      title: "Auspicious search needs MCP credentials",
+      body: "muhurta-api could not authenticate to panchang-mcp. Set MCP_SHARED_SECRET on the muhurta-api container so it can pass it as a Bearer token."
+    };
+  }
+  if (status === 400) {
+    return { title: "We could not understand that request", body: raw };
+  }
+  return { title: "Auspicious search failed", body: raw };
+}
+
 type GeocodeResponse = {
   hits: Array<{ label: string; latitude: number; longitude: number; timezone?: string | null }>;
 };
@@ -173,7 +209,24 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
     body: JSON.stringify(payload)
   });
   if (!res.ok) {
-    throw new Error(await res.text());
+    const text = await res.text();
+    let message = text;
+    let logicalStatus = res.status;
+    try {
+      const j = JSON.parse(text) as {
+        error?: string;
+        upstreamStatus?: number;
+      };
+      if (typeof j.error === "string") {
+        message = j.error;
+      }
+      if (typeof j.upstreamStatus === "number") {
+        logicalStatus = j.upstreamStatus;
+      }
+    } catch {
+      // keep raw body
+    }
+    throw new Error(`${logicalStatus}: ${message}`);
   }
   return (await res.json()) as T;
 }
@@ -197,6 +250,7 @@ export default function PanchangApp() {
   const [panchangDay, setPanchangDay] = useState<PanchangDayResponse | null>(null);
   const [snapshot, setSnapshot] = useState<SnapshotResponse | null>(null);
   const [muhurta, setMuhurta] = useState<MuhurtaResponse | null>(null);
+  const [muhurtaNotice, setMuhurtaNotice] = useState<AuspiciousNotice | null>(null);
   const [muhurtaQuery, setMuhurtaQuery] = useState(
     "Find auspicious daytime windows this week for an important event. Prefer at least 45 minutes."
   );
@@ -292,18 +346,24 @@ export default function PanchangApp() {
         setDayDetailNotice(detailNotice);
       } else if (nextView === "auspicious") {
         const parsed = parseMuhurtaQuery(muhurtaQuery, nextDate);
-        const data = await postJson<MuhurtaResponse>("/api/muhurta/search", {
-          date_start: parsed.date_start,
-          date_end: parsed.date_end,
-          timezone: nextObserver.timezone,
-          latitude: nextObserver.latitude,
-          longitude: nextObserver.longitude,
-          purpose_preset: parsed.purpose_preset,
-          min_duration_minutes: parsed.min_duration_minutes,
-          ayanamsha: nextObserver.ayanamsha,
-          engine: nextObserver.engine
-        });
-        setMuhurta(data);
+        try {
+          const data = await postJson<MuhurtaResponse>("/api/muhurta/search", {
+            date_start: parsed.date_start,
+            date_end: parsed.date_end,
+            timezone: nextObserver.timezone,
+            latitude: nextObserver.latitude,
+            longitude: nextObserver.longitude,
+            purpose_preset: parsed.purpose_preset,
+            min_duration_minutes: parsed.min_duration_minutes,
+            ayanamsha: nextObserver.ayanamsha,
+            engine: nextObserver.engine
+          });
+          setMuhurta(data);
+          setMuhurtaNotice(null);
+        } catch (muhurtaErr) {
+          setMuhurta(null);
+          setMuhurtaNotice(muhurtaNoticeFromError(muhurtaErr));
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Calculation failed");
@@ -368,8 +428,10 @@ export default function PanchangApp() {
         engine: observer.engine
       });
       setMuhurta(data);
+      setMuhurtaNotice(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Muhurta search failed");
+      setMuhurta(null);
+      setMuhurtaNotice(muhurtaNoticeFromError(e));
     } finally {
       setBusy(false);
     }
@@ -854,6 +916,7 @@ export default function PanchangApp() {
             observer={observer}
             result={muhurta}
             busy={busy}
+            notice={muhurtaNotice}
             onSearch={runMuhurtaSearch}
             onAnchorDateChange={(iso) => {
               setDate(iso);

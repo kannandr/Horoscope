@@ -28,7 +28,7 @@ fn radians(x: f64) -> f64 {
 fn degrees(x: f64) -> f64 {
     x * 180.0 / PI
 }
-fn centuries_j2000(jd: f64) -> f64 {
+pub(crate) fn centuries_j2000(jd: f64) -> f64 {
     (jd - 2451545.0) / 36525.0
 }
 
@@ -235,6 +235,20 @@ fn gmst_deg(jd: f64) -> f64 {
     )
 }
 
+/// Tropical ecliptic longitude of the ascendant (intersection of the eastern
+/// horizon with the ecliptic), degrees \[0, 360).
+///
+/// Uses GMST and true obliquity consistent with [`sun_altitude_deg`]. Formula:
+/// `atan2(sin(RAMC), cos(RAMC)*cos(ε) + tan(φ)*sin(ε))` with RAMC = GMST + λ_east.
+pub fn ascendant_tropical_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
+    let eps = radians(true_obliquity_deg(jd));
+    let phi = radians(lat_deg);
+    let theta = radians(reduce_deg(gmst_deg(jd) + lon_deg));
+    let y = theta.sin();
+    let x = theta.cos() * eps.cos() + phi.tan() * eps.sin();
+    reduce_deg(degrees(y.atan2(x)))
+}
+
 pub fn sun_altitude_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
     let lam = radians(sun_apparent_longitude_deg(jd));
     let eps = radians(true_obliquity_deg(jd));
@@ -257,8 +271,29 @@ pub fn sun_altitude_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use super::moon_apparent_longitude_deg;
+    use super::{ascendant_tropical_deg, moon_apparent_longitude_deg};
     use crate::time::julian_day_ut;
+
+    #[test]
+    fn ascendant_tropical_advances_with_ut() {
+        let jd0 = julian_day_ut(
+            Utc.with_ymd_and_hms(1990, 8, 15, 9, 2, 0)
+                .single()
+                .unwrap(),
+        );
+        let jd1 = jd0 + 1.0 / 24.0;
+        let a0 = ascendant_tropical_deg(jd0, 13.0827, 80.2707);
+        let a1 = ascendant_tropical_deg(jd1, 13.0827, 80.2707);
+        assert!(a0.is_finite() && a1.is_finite());
+        let mut d = (a1 - a0).abs();
+        if d > 180.0 {
+            d = 360.0 - d;
+        }
+        assert!(
+            d > 0.25 && d < 45.0,
+            "expected ascendant to shift over 1h UT, got Δ={d}° ({a0}° → {a1}°)"
+        );
+    }
 
     #[test]
     fn meeus_moon_snapshot_1992_matches_reference_range() {

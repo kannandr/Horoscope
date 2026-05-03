@@ -11,13 +11,16 @@ The current Rust engine covers the five basic Panchang angas:
 - karana
 
 It also includes sidereal Sun/Moon longitude, sunrise/sunset, hora, rashi,
-month cells, civil-day tithi/nakshatra segments, and a first-pass muhurta search.
+month cells, civil-day tithi/nakshatra/yoga/karana segments, a richer
+Panchang-day response, Rahu Kalam, Yama Gandam, Gulika Kalam, Abhijit
+Muhurta, and basic Tamil solar calendar metadata.
 
 For a sophisticated Indian/Tamil Panchang and muhurta platform, the next step is
-not to "teach" an LLM to calculate Panchang. The Rust engine must remain the
-authority for astronomy, calendar boundaries, and rule evaluation. A local model
-should parse natural language, ask missing questions, call the Panchang MCP
-tools, and explain the deterministic rule output in a natural voice.
+not to "teach" an LLM to calculate Panchang. `panchang-core` must remain the
+authority for astronomy and calendar boundaries. `muhurta-engine` should remain
+the authority for rule evaluation. A local model should parse natural language,
+ask missing questions, call the Panchang MCP and muhurta API surfaces, and
+explain deterministic Rust output in a natural voice.
 
 ## Current Coverage
 
@@ -35,31 +38,31 @@ tools, and explain the deterministic rule output in a natural voice.
 - Vaara by local civil weekday.
 - Sunrise, sunset, next sunrise.
 - Hora table.
-- Tithi/nakshatra civil-day intervals.
+- Tithi/nakshatra/yoga/karana civil-day intervals.
+- Rich Panchang-day response with civil-midnight and sunrise-day modes.
+- Rahu Kalam, Yama Gandam, Gulika Kalam, and Abhijit Muhurta.
+- Basic Tamil calendar metadata: solar month, year name, ayana, ritu, weekday.
 - Month view day cells.
-- MCP tools for snapshot, civil-day segments, muhurta search, and explanation.
+- MCP tools for snapshot, civil-day segments, Panchang day, and inauspicious periods.
+- Separate `muhurta-engine` / `muhurta-api` for auspicious-time scoring.
 
 ### Important Gaps
 
-- No full Panchang-day model anchored to sunrise-to-sunrise.
-- Civil-day response only includes tithi and nakshatra intervals; yoga and
-  karana intervals are missing from the day/month API shape.
-- Vaara is currently civil weekday; many Panchang/muhurta uses need the day
-  lord from sunrise.
-- No rahu kalam, yama gandam, gulika kalam, abhijit muhurta, durmuhurta,
-  varjyam, amrita kalam, or simple nalla neram/gowri panchangam blocks.
+- No durmuhurta, varjyam, amrita kalam, or simple nalla neram/gowri panchangam blocks.
 - No moonrise/moonset.
-- No Tamil solar calendar layer: Tamil month, Tamil year, ritu, ayana,
-  sankranti, paksha labels in Tamil, festival-ready day metadata.
+- Tamil solar calendar layer is started, but not complete: sankranti,
+  paksha labels in Tamil, festival-ready day metadata, and Tamil-script labels
+  are still missing.
 - No personal astrology layer: janma nakshatra, janma rashi, tara bala,
   chandra bala, chandrashtama, panchaka, ganda moola, vedha, or event-specific
   compatibility rules.
 - No horoscope/jataka layer: graha positions beyond Sun/Moon, lagna, houses,
   varga charts, dasha, retrograde status, or transit context.
-- Muhurta search is currently a simple hourly scorer. It is not yet a real
-  rule engine.
-- The MCP layer exposes only broad tools. It does not expose rule catalogs,
-  personal-context evaluation, or a natural-language muhurta workflow.
+- Muhurta search is currently a simple hourly scorer in `muhurta-engine`. It is
+  not yet a real rule-pack engine.
+- The MCP layer intentionally exposes calculation tools only. It does not
+  expose rule catalogs, personal-context evaluation, or a natural-language
+  muhurta workflow.
 
 ## Engine Hardening Plan
 
@@ -169,6 +172,9 @@ The Rust engine should output:
 - exact local timestamps
 - source rule IDs
 
+These rule-pack outputs belong in `muhurta-engine`, not `panchang-core`.
+`panchang-core` should continue to provide facts only.
+
 ## Personal Muhurta Inputs
 
 The natural-language workflow should extract a structured request:
@@ -209,16 +215,23 @@ for either:
 
 Add these MCP tools:
 
+Current calculation tools:
+
+- `calculate_panchang_snapshot`
+- `list_civil_day_segments`
 - `calculate_panchang_day`
+- `list_inauspicious_periods`
+
+Candidate future calculation tools:
+
 - `list_panchang_intervals`
 - `calculate_tamil_calendar_day`
-- `list_inauspicious_periods`
-- `evaluate_muhurta_rules`
-- `search_personalized_muhurta`
-- `explain_muhurta_rules`
 - `calculate_birth_profile`
 
-Keep existing tools for compatibility.
+Do not put final muhurta scoring back into `panchang-mcp`. Keep
+`evaluate_muhurta_rules`, `search_personalized_muhurta`, and
+`explain_muhurta_rules` in `muhurta-api` or a future local agent layer that
+calls `panchang-mcp`.
 
 ## Local Model Recommendation
 

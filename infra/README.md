@@ -6,13 +6,15 @@ This folder contains the Container Apps deployment.
 
 - `web`: Next.js UI, **public** external ingress (Container Apps easy auth **disabled**).
 - `api`: Rust HTTP API, **internal** ingress (reachable only from inside the Container Apps environment, e.g. from `web`).
-- `mcp`: MCP endpoint at **`/mcp`**, **public** external ingress with an app-level shared GUID password. Pass it as `Authorization: Bearer <value>` or `x-mcp-password: <value>`.
+- `mcp`: Panchang MCP at **`/mcp`**, **public** external ingress with an app-level shared GUID password.
+- `horoscope-mcp`: Natal-chart MCP at **`/mcp`**, **public** external ingress, same shared-secret headers as `mcp`.
+- `muhurta`: Rust HTTP API for auspicious-time search, **internal** ingress.
 
 ## Required parameters (Bicep)
 
 - `acrName`: **short name** of a Container Registry that already exists in the same resource group (5–50 alphanumeric characters, globally unique in Azure). The GitHub Action creates the registry on first run if it is missing.
-- `webImage`, `apiImage`, `mcpImage`: full ACR image references (e.g. `myregistry.azurecr.io/panchang-web:abc123`).
-- `mcpSharedSecret`: shared password stored as a Container Apps secret and exposed to the MCP container as `MCP_SHARED_SECRET`.
+- `webImage`, `apiImage`, `mcpImage`, `muhurtaImage`, `horoscopeImage`: full ACR image references (e.g. `myregistry.azurecr.io/panchang-web:abc123`).
+- `mcpSharedSecret`: shared password stored as a Container Apps secret and exposed to **both** MCP containers as `MCP_SHARED_SECRET`.
 
 The deployment intentionally creates no application database. State is limited to
 Container Apps runtime configuration, logs, metrics, and disposable in-process caches.
@@ -22,8 +24,8 @@ Container Apps runtime configuration, logs, metrics, and disposable in-process c
 The `platform` workflow (manual `workflow_dispatch`):
 
 1. Creates the resource group and ACR if they do not exist.
-2. Builds the three images in ACR with `az acr build`.
-3. Deploys `infra/bicep/main.bicep`, which references the **existing** registry and provisions Log Analytics, App Insights, the Container Apps environment, and the three apps.
+2. Builds the images in ACR with `az acr build` (`panchang-api`, `panchang-mcp`, `horoscope-mcp`, `muhurta-api`, `panchang-web`).
+3. Deploys `infra/bicep/main.bicep`, which references the **existing** registry and provisions Log Analytics, App Insights, the Container Apps environment, and the apps.
 
 Set repository **Variables** (Settings → Secrets and variables → Actions → Variables):
 
@@ -61,7 +63,7 @@ From the deployment in the Azure portal, or:
 az deployment group show -g "$RG" -n <deployment-name> --query properties.outputs -o json
 ```
 
-Bicep outputs include `webUrl` and `mcpUrl`.
+Bicep outputs include `webUrl`, `mcpUrl`, and `horoscopeMcpUrl`.
 
 ## Local / CLI deploy (same Bicep)
 
@@ -78,5 +80,7 @@ az deployment group create \
     webImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-web:TAG" \
     apiImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-api:TAG" \
     mcpImage="${AZURE_REGISTRY_NAME}.azurecr.io/panchang-mcp:TAG" \
+    muhurtaImage="${AZURE_REGISTRY_NAME}.azurecr.io/muhurta-api:TAG" \
+    horoscopeImage="${AZURE_REGISTRY_NAME}.azurecr.io/horoscope-mcp:TAG" \
     mcpSharedSecret="$MCP_SHARED_SECRET"
 ```

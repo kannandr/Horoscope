@@ -1,7 +1,29 @@
 use panchang_core::{
-    civil_day, month, panchang_day, search_muhurta, snapshot, CivilDayRequest, MonthRequest,
-    MuhurtaSearchRequest, PanchangDayMode, PanchangDayRequest, SnapshotRequest,
+    civil_day, month, panchang_day, snapshot, CivilDayRequest, MonthRequest, PanchangDayMode,
+    PanchangDayRequest, SnapshotRequest,
 };
+
+#[test]
+fn snapshot_accepts_dates_about_one_century_before_and_after() {
+    // No server-side "last 100 years only" policy: any ISO civil datetime the
+    // parser accepts is allowed. This locks ~±100y from the smoke fixture year.
+    for (when_local, label) in [
+        ("1926-06-15T12:00:00", "past_century"),
+        ("2126-06-15T12:00:00", "future_century"),
+    ] {
+        let out = snapshot(SnapshotRequest {
+            when_local: when_local.to_string(),
+            timezone: "Asia/Kolkata".to_string(),
+            latitude: 12.97,
+            longitude: 77.59,
+            ayanamsha: None,
+            engine: None,
+        })
+        .unwrap_or_else(|e| panic!("{label}: {e:?}"));
+        assert!((1..=30).contains(&out.angas.tithi_index), "{label} tithi");
+        assert!((1..=27).contains(&out.angas.nakshatra_index), "{label} nakshatra");
+    }
+}
 
 #[test]
 fn snapshot_bangalore_smoke() {
@@ -70,7 +92,7 @@ fn panchang_day_has_hora_and_bad_periods() {
 }
 
 #[test]
-fn month_and_muhurta_run() {
+fn month_runs_for_april() {
     let out = month(MonthRequest {
         year: 2026,
         month: 4,
@@ -82,18 +104,4 @@ fn month_and_muhurta_run() {
     })
     .expect("month");
     assert_eq!(out.days.len(), 30);
-
-    let muhurta = search_muhurta(MuhurtaSearchRequest {
-        date_start: "2026-04-30".to_string(),
-        date_end: "2026-04-30".to_string(),
-        timezone: "Asia/Kolkata".to_string(),
-        latitude: 12.97,
-        longitude: 77.59,
-        purpose_preset: None,
-        min_duration_minutes: Some(45),
-        ayanamsha: None,
-        engine: None,
-    })
-    .expect("muhurta");
-    assert_eq!(muhurta.preset, "south_indian_tamil_general");
 }

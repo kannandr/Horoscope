@@ -58,10 +58,14 @@ jobs:
           if ! az acr show --name "$REGISTRY_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
             az acr create --name "$REGISTRY_NAME" --resource-group "$RESOURCE_GROUP" --sku Basic
           fi
-      - name: Build and push API image
+      - name: Build and push panchang-api image
         run: az acr build --registry "$REGISTRY_NAME" --image "panchang-api:${GITHUB_SHA}" --file rust/crates/panchang-api/Dockerfile .
-      - name: Build and push MCP image
+      - name: Build and push panchang-mcp image
         run: az acr build --registry "$REGISTRY_NAME" --image "panchang-mcp:${GITHUB_SHA}" --file rust/crates/panchang-mcp/Dockerfile .
+      - name: Build and push muhurta-api image
+        run: az acr build --registry "$REGISTRY_NAME" --image "muhurta-api:${GITHUB_SHA}" --file rust/crates/muhurta-api/Dockerfile .
+      - name: Build and push horoscope-mcp image
+        run: az acr build --registry "$REGISTRY_NAME" --image "horoscope-mcp:${GITHUB_SHA}" --file rust/crates/horoscope-mcp/Dockerfile .
       - name: Build and push web image
         run: az acr build --registry "$REGISTRY_NAME" --image "panchang-web:${GITHUB_SHA}" --file web/Dockerfile .
       - name: Deploy Container Apps
@@ -76,4 +80,6 @@ jobs:
           webImage="${REGISTRY_NAME}.azurecr.io/panchang-web:${GITHUB_SHA}"
           apiImage="${REGISTRY_NAME}.azurecr.io/panchang-api:${GITHUB_SHA}"
           mcpImage="${REGISTRY_NAME}.azurecr.io/panchang-mcp:${GITHUB_SHA}"
+          muhurtaImage="${REGISTRY_NAME}.azurecr.io/muhurta-api:${GITHUB_SHA}"
+          horoscopeImage="${REGISTRY_NAME}.azurecr.io/horoscope-mcp:${GITHUB_SHA}"
           mcpSharedSecret="${{ secrets.MCP_SHARED_SECRET }}"

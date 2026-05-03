@@ -5,10 +5,10 @@ mod ayanamsha;
 mod boundaries;
 mod day_segments;
 mod ephemeris;
+mod planets_jpl;
 mod hora;
 mod meeus_tables;
-mod muhurta;
-mod names;
+pub mod names;
 mod rise_set;
 mod time;
 mod types;
@@ -16,8 +16,16 @@ mod types;
 use chrono::Datelike;
 
 pub use crate::day_segments::{civil_day, month, panchang_day};
-pub use crate::muhurta::search_muhurta;
-pub use crate::time::{datetime_utc_from_jd, julian_day_ut, local_to_utc};
+pub use crate::ephemeris::{ascendant_tropical_deg, reduce_deg};
+pub use crate::planets_jpl::{
+    mean_north_node_apparent_longitude_deg, mean_north_node_tropical_longitude_deg,
+    planet_geocentric_apparent_longitude_deg, planet_geocentric_longitude_retrograde, KeplerPlanet,
+};
+
+pub use crate::time::{
+    datetime_utc_from_jd, julian_day_ut, local_iso_from_jd, local_to_utc, parse_date,
+    parse_local_datetime, parse_timezone,
+};
 pub use crate::types::*;
 
 pub fn snapshot(req: SnapshotRequest) -> Result<SnapshotResponse, PanchangError> {

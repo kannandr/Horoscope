@@ -100,19 +100,6 @@ pub struct MonthRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
-pub struct MuhurtaSearchRequest {
-    pub date_start: String,
-    pub date_end: String,
-    pub timezone: String,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub purpose_preset: Option<String>,
-    pub min_duration_minutes: Option<u32>,
-    pub ayanamsha: Option<AyanamshaId>,
-    pub engine: Option<EngineId>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 pub struct PanchangAngas {
     pub elongation_deg: f64,
     pub tithi_index: u8,
@@ -271,30 +258,12 @@ pub struct MonthResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
-pub struct MuhurtaWindow {
-    pub start_local: String,
-    pub end_local: String,
-    pub duration_minutes: u32,
-    pub score: i32,
-    pub label: String,
-    pub reasons: Vec<String>,
-    pub exclusions: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
-pub struct MuhurtaSearchResponse {
-    pub preset: String,
-    pub timezone: String,
-    pub windows: Vec<MuhurtaWindow>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
     pub request_id: Option<String>,
 }
 
-pub(crate) fn validate_observer(latitude: f64, longitude: f64) -> Result<(), PanchangError> {
+pub fn validate_observer(latitude: f64, longitude: f64) -> Result<(), PanchangError> {
     if (-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude) {
         Ok(())
     } else {

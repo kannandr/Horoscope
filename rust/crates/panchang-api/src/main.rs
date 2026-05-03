@@ -7,8 +7,8 @@ use axum::{
     Router,
 };
 use panchang_core::{
-    civil_day, month, panchang_day, search_muhurta, snapshot, CivilDayRequest, ErrorResponse,
-    MonthRequest, MuhurtaSearchRequest, PanchangDayRequest, PanchangError, SnapshotRequest,
+    civil_day, month, panchang_day, snapshot, CivilDayRequest, ErrorResponse, MonthRequest,
+    PanchangDayRequest, PanchangError, SnapshotRequest,
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(snapshot_handler, civil_day_handler, panchang_day_handler, month_handler, muhurta_handler, healthz, readyz),
+    paths(snapshot_handler, civil_day_handler, panchang_day_handler, month_handler, healthz, readyz),
     components(schemas(
         SnapshotRequest,
         panchang_core::SnapshotResponse,
@@ -27,8 +27,6 @@ use uuid::Uuid;
         panchang_core::PanchangDayResponse,
         MonthRequest,
         panchang_core::MonthResponse,
-        MuhurtaSearchRequest,
-        panchang_core::MuhurtaSearchResponse,
         ErrorResponse
     )),
     tags((name = "panchang", description = "Native Panchang calculation API"))
@@ -53,7 +51,6 @@ async fn main() {
         .route("/v1/panchang/civil-day", post(civil_day_handler))
         .route("/v1/panchang/day", post(panchang_day_handler))
         .route("/v1/panchang/month", post(month_handler))
-        .route("/v1/muhurta/search", post(muhurta_handler))
         .layer(middleware::from_fn(request_id))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
@@ -117,13 +114,6 @@ async fn panchang_day_handler(
 #[utoipa::path(post, path = "/v1/panchang/month", request_body = MonthRequest, responses((status = 200, body = panchang_core::MonthResponse), (status = 400, body = ErrorResponse)))]
 async fn month_handler(Json(req): Json<MonthRequest>) -> Result<impl IntoResponse, ApiError> {
     Ok(Json(month(req)?))
-}
-
-#[utoipa::path(post, path = "/v1/muhurta/search", request_body = MuhurtaSearchRequest, responses((status = 200, body = panchang_core::MuhurtaSearchResponse), (status = 400, body = ErrorResponse)))]
-async fn muhurta_handler(
-    Json(req): Json<MuhurtaSearchRequest>,
-) -> Result<impl IntoResponse, ApiError> {
-    Ok(Json(search_muhurta(req)?))
 }
 
 struct ApiError(PanchangError);
