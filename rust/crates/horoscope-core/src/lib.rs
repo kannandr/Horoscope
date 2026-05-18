@@ -339,6 +339,24 @@ mod tests {
     }
 
     #[test]
+    fn coimbatore_1971_reference_rasi_and_lagna() {
+        let chart = calculate_south_indian_natal_chart(NatalChartRequest {
+            birth_local: "1971-10-10T15:30:00".to_string(),
+            timezone: "Asia/Kolkata".to_string(),
+            latitude: 11.0168,
+            longitude: 76.9558,
+            ayanamsha: Some(AyanamshaId::Lahiri),
+            engine: Some(EngineId::Meeus),
+            dasha_horizon_years: Some(1),
+            as_of_local: Some("2026-01-01T00:00:00".to_string()),
+        })
+        .expect("chart");
+
+        assert_eq!(chart.grahas.moon.rashi_name, "Mithuna");
+        assert_eq!(chart.lagna.rashi_name_tamil, "Kumbam");
+    }
+
+    #[test]
     fn navagraha_longitudes_present() {
         let chart = calculate_south_indian_natal_chart(NatalChartRequest {
             birth_local: "1999-06-21T12:00:00".to_string(),

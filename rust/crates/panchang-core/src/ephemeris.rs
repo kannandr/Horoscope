@@ -239,13 +239,13 @@ fn gmst_deg(jd: f64) -> f64 {
 /// horizon with the ecliptic), degrees \[0, 360).
 ///
 /// Uses GMST and true obliquity consistent with [`sun_altitude_deg`]. Formula:
-/// `atan2(sin(RAMC), cos(RAMC)*cos(ε) + tan(φ)*sin(ε))` with RAMC = GMST + λ_east.
+/// `atan2(cos(RAMC), -(sin(RAMC)*cos(ε) + tan(φ)*sin(ε)))` with RAMC = GMST + λ_east.
 pub fn ascendant_tropical_deg(jd: f64, lat_deg: f64, lon_deg: f64) -> f64 {
     let eps = radians(true_obliquity_deg(jd));
     let phi = radians(lat_deg);
     let theta = radians(reduce_deg(gmst_deg(jd) + lon_deg));
-    let y = theta.sin();
-    let x = theta.cos() * eps.cos() + phi.tan() * eps.sin();
+    let y = theta.cos();
+    let x = -(theta.sin() * eps.cos() + phi.tan() * eps.sin());
     reduce_deg(degrees(y.atan2(x)))
 }
 

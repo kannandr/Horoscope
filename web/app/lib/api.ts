@@ -135,6 +135,88 @@ export type MuhurtaResponse = {
   }>;
 };
 
+export type HoroscopeBody = {
+  sidereal_longitude_deg: number;
+  rashi_index: number;
+  rashi_name: string;
+  nakshatra_index: number;
+  nakshatra_name: string;
+  nakshatra_pada: number;
+  retrograde?: boolean;
+  rashi_name_tamil?: string;
+  nakshatra_name_tamil?: string;
+};
+
+export type HoroscopeResponse = {
+  schema_version: string;
+  kind: "south_indian_natal_chart";
+  birth: {
+    birth_local: string;
+    timezone: string;
+    latitude: number;
+    longitude: number;
+    utc_iso: string;
+    jd_ut: number;
+  };
+  frame: {
+    ayanamsha: AyanamshaId;
+    ayanamsha_deg: number;
+    engine: EngineId;
+    sidereal_zodiac: string;
+    lunar_node_policy?: string;
+    slow_planet_ephemeris?: string;
+  };
+  lagna: HoroscopeBody;
+  grahas: Record<
+    "sun" | "moon" | "mars" | "mercury" | "jupiter" | "venus" | "saturn" | "rahu" | "ketu",
+    HoroscopeBody
+  >;
+  panchang_at_birth: {
+    vaara: string;
+    tithi_name: string;
+    yoga_name: string;
+    karana_name: string;
+    paksha: string;
+    sunrise_local?: string | null;
+    sunset_local?: string | null;
+  };
+  tamil_calendar_hint: {
+    solar_month_name: string;
+    solar_month_name_tamil: string;
+    tamil_year_name: string;
+    weekday_name_tamil: string;
+  };
+  dasha_bhukti: {
+    system: string;
+    moon_at_birth: {
+      nakshatra_index: number;
+      nakshatra_name: string;
+      starting_mahadasha_lord: string;
+      balance_of_starting_mahadasha_at_birth_days: number;
+    };
+    window: {
+      as_of_local: string;
+      horizon_end_local: string;
+      horizon_years_after_as_of: number;
+      timezone: string;
+    };
+    mahadashas: Array<{
+      lord: string;
+      lord_display_en: string;
+      lord_display_ta: string;
+      start_local: string;
+      end_local: string;
+      antardashas: Array<{
+        lord: string;
+        lord_display_en: string;
+        lord_display_ta: string;
+        start_local: string;
+        end_local: string;
+      }>;
+    }>;
+  };
+};
+
 /** Time portion (HH:MM:SS) extracted from an ISO local-datetime string. */
 export function timeOnly(value: string): string {
   const match = value.match(/T(\d\d:\d\d:\d\d)/);

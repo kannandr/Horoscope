@@ -37,11 +37,14 @@ npm run dev
 
 The UI talks to two upstreams:
 
-- `PANCHANG_API_BASE_URL` (default `http://localhost:8080`) for calendar /
+- `PANCHANG_API_BASE_URL` (default `http://127.0.0.1:8080`) for calendar /
   day / snapshot data.
-- `MUHURTA_API_BASE_URL` (default `http://localhost:8090`) for
+- `MUHURTA_API_BASE_URL` (default `http://127.0.0.1:8090`) for
   auspicious-time search. This is optional if you are only using the calendar
   views.
+- `HOROSCOPE_MCP_BASE_URL` (default `http://127.0.0.1:8790`) for the Horoscope
+  tab. The Next.js server calls `horoscope-mcp` directly over JSON-RPC `/mcp`
+  and passes `MCP_SHARED_SECRET` as a Bearer token when configured.
 
 ### Horoscope MCP (natal chart)
 

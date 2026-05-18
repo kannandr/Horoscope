@@ -11,13 +11,14 @@ import type {
 } from "@/app/lib/api";
 import { timeOnly } from "@/app/lib/api";
 import { AuspiciousView } from "@/app/components/AuspiciousView";
+import { HoroscopeView } from "@/app/components/HoroscopeView";
 import { parseMuhurtaQuery } from "@/app/lib/muhurtaParse";
 import {
   panchangDayFromCivilAndSnapshot,
   panchangDayFromSnapshotOnly
 } from "@/app/lib/panchangDayFallback";
 
-type View = "month" | "week" | "day" | "auspicious";
+type View = "month" | "week" | "day" | "auspicious" | "horoscope";
 
 /** Short banner when full-day API is unavailable (still all-local Rust). */
 type DayDetailNotice = { title: string; body: string };
@@ -452,7 +453,7 @@ export default function PanchangApp() {
     }
   }
 
-  /* Keyboard shortcuts: M/W/D/A for views, T for today, ←/→ for prev/next, / to focus search.
+  /* Keyboard shortcuts: M/W/D/A/H for views, T for today, ←/→ for prev/next, / to focus search.
      Inputs and contenteditable nodes are skipped so users can type normally. */
   const goPrevRef = useRef(goPrev);
   const goNextRef = useRef(goNext);
@@ -495,6 +496,8 @@ export default function PanchangApp() {
         switchViewRef.current("day");
       } else if (k === "a") {
         switchViewRef.current("auspicious");
+      } else if (k === "h") {
+        switchViewRef.current("horoscope");
       } else if (k === "t") {
         goTodayRef.current();
       } else if (e.key === "ArrowLeft") {
@@ -660,6 +663,12 @@ export default function PanchangApp() {
       return {
         title: "Auspicious times",
         sub: "Tamil / South Indian preset · describe your event below"
+      };
+    }
+    if (view === "horoscope") {
+      return {
+        title: "Horoscope",
+        sub: "South Indian natal chart via MCP"
       };
     }
     if (view === "day") {
@@ -856,7 +865,7 @@ export default function PanchangApp() {
           <span className="month-sub">{heading.sub}</span>
         </h1>
         <nav className="seg" role="tablist" aria-label="Calendar views">
-          {(["month", "week", "day", "auspicious"] as View[]).map((v) => (
+          {(["month", "week", "day", "auspicious", "horoscope"] as View[]).map((v) => (
             <button
               key={v}
               role="tab"
@@ -864,7 +873,7 @@ export default function PanchangApp() {
               tabIndex={view === v ? 0 : -1}
               onClick={() => switchView(v)}
             >
-              {v === "auspicious" ? "Auspicious" : v[0].toUpperCase() + v.slice(1)}
+              {v === "auspicious" ? "Auspicious" : v === "horoscope" ? "Horoscope" : v[0].toUpperCase() + v.slice(1)}
             </button>
           ))}
         </nav>
@@ -923,6 +932,9 @@ export default function PanchangApp() {
               void compute("auspicious", iso);
             }}
           />
+        )}
+        {view === "horoscope" && (
+          <HoroscopeView observer={observer} placeLabel={placeLabel} placeSearch={address} />
         )}
       </div>
       </div>
