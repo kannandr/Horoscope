@@ -23,7 +23,7 @@ Current implementation status:
   Public HTTPS, gated by `MCP_SHARED_SECRET`.
 - `horoscope-core` (Rust lib) + `horoscope-mcp` (Rust bin) — South Indian natal
   chart + Vimshottari dasha–bhukti; same MCP auth and JSON-RPC envelope as
-  `panchang-mcp`. See [`docs/horoscope-mcp.md`](horoscope-mcp.md).
+  `panchang-mcp`. See [`docs/horoscope-mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/horoscope-mcp.md).
 
 ### Usage apps (consume the core)
 
@@ -83,7 +83,7 @@ The web UI and any model/agent **must not** duplicate Panchang logic.
 
 - For South Indian natal chart JSON (lagna, grahas Sun/Moon, dasha–bhukti):
   call **`horoscope-mcp`** (`calculate_south_indian_natal_chart`). Details:
-  [`docs/horoscope-mcp.md`](horoscope-mcp.md).
+  [`docs/horoscope-mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/horoscope-mcp.md).
 
 The Panchang MCP server deliberately does **not** expose muhurta scoring tools.
 That keeps MCP suitable for open-source release as a calculation layer, while

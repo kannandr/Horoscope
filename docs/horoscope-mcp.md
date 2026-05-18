@@ -1,11 +1,11 @@
 # Horoscope MCP Server (`horoscope-mcp`)
 
 Separate MCP binary for **South Indian sidereal natal charts**. It shares the same
-HTTP JSON-RPC pattern as [`docs/mcp.md`](mcp.md) (`POST /mcp`, `initialize`,
+HTTP JSON-RPC pattern as [`docs/mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/mcp.md) (`POST /mcp`, `initialize`,
 `tools/list`, `tools/call`, `structuredContent`), and the same optional
 `MCP_SHARED_SECRET` guard.
 
-Design reference: [`docs/south-indian-horoscope-mcp-plan.md`](south-indian-horoscope-mcp-plan.md).
+Design reference: [`docs/south-indian-horoscope-mcp-plan.md`](https://github.com/kannandr/Horoscope/blob/main/docs/south-indian-horoscope-mcp-plan.md).
 
 ## Tool
 

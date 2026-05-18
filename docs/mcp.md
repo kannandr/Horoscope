@@ -20,7 +20,7 @@ Current tools:
 
 **South Indian natal charts** are served by a sibling binary, **`horoscope-mcp`**
 (same JSON-RPC envelope and auth). Its tool is `calculate_south_indian_natal_chart`.
-See [`docs/horoscope-mcp.md`](horoscope-mcp.md).
+See [`docs/horoscope-mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/horoscope-mcp.md).
 
 Auspicious-time scoring lives in `muhurta-engine` / `muhurta-api`.
 `PANCHANG_MCP_BASE_URL` is set, `muhurta-api` becomes an MCP client of this
@@ -259,7 +259,7 @@ Auspicious-time scoring (formerly `search_auspicious_windows` /
 that service. With `PANCHANG_MCP_BASE_URL` set, that service calls this MCP
 server over JSON-RPC and reads `result.structuredContent`. Without that
 environment variable, it falls back to in-process `panchang-core` for local
-developer convenience. See [`docs/rust-engine.md`](rust-engine.md) for the
+developer convenience. See [`docs/rust-engine.md`](https://github.com/kannandr/Horoscope/blob/main/docs/rust-engine.md) for the
 boundary.
 
 ## JSON-RPC Examples
@@ -367,7 +367,7 @@ MCP_SHARED_SECRET=local-dev-secret cargo run -p panchang-mcp
 Local endpoint:
 
 ```text
-http://localhost:8080/mcp
+http://127.0.0.1:8080/mcp
 ```
 
 If `MCP_SHARED_SECRET` is unset or empty, local `/mcp` calls are allowed without

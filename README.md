@@ -8,11 +8,11 @@ deployment lives under `infra/`.
 
 Useful docs:
 
-- Architecture: [`docs/platform-architecture.md`](docs/platform-architecture.md)
-- Rust engine review: [`docs/rust-engine.md`](docs/rust-engine.md)
-- MCP integration (Panchang + Horoscope): [`docs/mcp.md`](docs/mcp.md), [`docs/horoscope-mcp.md`](docs/horoscope-mcp.md)
-- South Indian **natal horoscope MCP** (plan + JSON contract): [`docs/south-indian-horoscope-mcp-plan.md`](docs/south-indian-horoscope-mcp-plan.md)
-- Local muhurta-agent roadmap: [`docs/panchang-engine-and-local-muhurta-agent.md`](docs/panchang-engine-and-local-muhurta-agent.md)
+- Architecture: [`docs/platform-architecture.md`](https://github.com/kannandr/Horoscope/blob/main/docs/platform-architecture.md)
+- Rust engine review: [`docs/rust-engine.md`](https://github.com/kannandr/Horoscope/blob/main/docs/rust-engine.md)
+- MCP integration (Panchang + Horoscope): [`docs/mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/mcp.md), [`docs/horoscope-mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/horoscope-mcp.md)
+- South Indian **natal horoscope MCP** (plan + JSON contract): [`docs/south-indian-horoscope-mcp-plan.md`](https://github.com/kannandr/Horoscope/blob/main/docs/south-indian-horoscope-mcp-plan.md)
+- Local muhurta-agent roadmap: [`docs/panchang-engine-and-local-muhurta-agent.md`](https://github.com/kannandr/Horoscope/blob/main/docs/panchang-engine-and-local-muhurta-agent.md)
 
 ## Run locally
 
@@ -56,7 +56,7 @@ Panchang at birth, Tamil hints, Vimshottari dasha–bhukti — is served by **`h
 BIND_ADDR=0.0.0.0:8790 cargo run -p horoscope-mcp
 ```
 
-See [`docs/horoscope-mcp.md`](docs/horoscope-mcp.md) and [`docs/south-indian-horoscope-mcp-plan.md`](docs/south-indian-horoscope-mcp-plan.md).
+See [`docs/horoscope-mcp.md`](https://github.com/kannandr/Horoscope/blob/main/docs/horoscope-mcp.md) and [`docs/south-indian-horoscope-mcp-plan.md`](https://github.com/kannandr/Horoscope/blob/main/docs/south-indian-horoscope-mcp-plan.md).
 
 ### Phase 2: Muhurta calls Panchang via MCP (recommended)
 
@@ -136,7 +136,7 @@ Infrastructure is in `infra/bicep/`. GitHub Actions workflow **platform** (`.git
 
 1. In Azure, pick a **resource group** name, **region** (e.g. `westus3`), and a **globally unique** ACR short name (alphanumeric, e.g. `panchangstgacr`).
 2. In the GitHub repo, add **Actions variables**: `AZURE_RESOURCE_GROUP`, `AZURE_REGISTRY_NAME`, and optionally `AZURE_LOCATION`.
-3. Add **Actions secrets** for workload identity / service principal login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and MCP access (`MCP_SHARED_SECRET`). Full tables are in [`infra/README.md`](infra/README.md).
+3. Add **Actions secrets** for workload identity / service principal login (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and MCP access (`MCP_SHARED_SECRET`). Full tables are in [`infra/README.md`](https://github.com/kannandr/Horoscope/blob/main/infra/README.md).
 4. Grant that identity `Contributor` plus `User Access Administrator` on the target resource group. `User Access Administrator` is needed because the Bicep template assigns `AcrPull` to the Container Apps managed identity.
 
 ### Run deploy
@@ -145,4 +145,4 @@ Open **Actions → platform → Run workflow**. Only the **workflow_dispatch** j
 
 After deployment, the **web** URL is in the ARM deployment outputs (`webUrl`; see `infra/README.md`). **Web is public HTTPS**. **MCP is public HTTPS but requires the shared GUID password** on `/mcp` using either `Authorization: Bearer <MCP_SHARED_SECRET>` or `x-mcp-password: <MCP_SHARED_SECRET>`.
 
-See [`infra/README.md`](infra/README.md) for CLI equivalents and parameter details.
+See [`infra/README.md`](https://github.com/kannandr/Horoscope/blob/main/infra/README.md) for CLI equivalents and parameter details.

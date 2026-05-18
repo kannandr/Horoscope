@@ -1,8 +1,8 @@
 # Horoscope Panchang — objectives and progress
 
 This document records **why** the project exists and **what has been implemented** so far.
-For a quick run guide, see [`README.md`](README.md). For runtime shape, see
-[`docs/platform-architecture.md`](docs/platform-architecture.md).
+For a quick run guide, see [`README.md`](https://github.com/kannandr/Horoscope/blob/main/README.md). For runtime shape, see
+[`docs/platform-architecture.md`](https://github.com/kannandr/Horoscope/blob/main/docs/platform-architecture.md).
 
 ## Objective
 
@@ -24,7 +24,7 @@ serves humans, services, and language models.
 | Infra       | `infra/bicep/`                    | Azure Container Apps deployment.                              |
 
 The Next.js server proxies `/api/panchang/*` to the Rust API
-(`PANCHANG_API_BASE_URL`, default `http://localhost:8080`). Address search and
+(`PANCHANG_API_BASE_URL`, default `http://127.0.0.1:8080`). Address search and
 reverse geocoding run inside the Next.js server (`tz-lookup` + Nominatim) so
 the deterministic engine never touches network I/O.
 
